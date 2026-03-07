@@ -123,6 +123,14 @@ const PatientDashboard = ({
         alarmStopRef.current = null;
       }
     }
+
+    // Unmount cleanup: halt any playing audio
+    return () => {
+      if (alarmStopRef.current) {
+        alarmStopRef.current();
+        alarmStopRef.current = null;
+      }
+    };
   }, [patient?.emergencyTriggered, role]);
 
   if (!patient) return <div style={{padding: '40px', textAlign: 'center'}}>Loading Patient Data...</div>;
