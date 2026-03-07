@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import RoleSelection from './pages/RoleSelection';
 import PortalSelection from './pages/PortalSelection';
 import Login from './pages/Login';
