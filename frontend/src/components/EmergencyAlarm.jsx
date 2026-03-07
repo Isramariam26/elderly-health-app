@@ -1,137 +1,88 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
-// ─── Module-level AudioContext (persists across renders) ──────────────────────
-// We create and warm it up on the FIRST user gesture anywhere, so it's
-// already in 'running' state by the time a WebSocket alarm arrives.
-let _audioCtx = null;
+// ─── MODULE-LEVEL SINGLETON ALARM ─────────────────────────────────────────────
+// Only ONE alarm can play at a time. Any call to stopAlarm() kills it instantly.
+let _alarmCtx = null;
+let _alarmStopped = true;
+let _alarmTimeoutId = null;
 
-const getAudioCtx = () => {
-  if (!_audioCtx) {
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    if (!AudioCtx) return null;
-    _audioCtx = new AudioCtx();
+const stopAlarm = () => {
+  _alarmStopped = true;
+  if (_alarmTimeoutId !== null) {
+    clearTimeout(_alarmTimeoutId);
+    _alarmTimeoutId = null;
   }
-  return _audioCtx;
-};
-
-// Call this once on any user gesture to unlock audio
-const unlockAudio = () => {
-  const ctx = getAudioCtx();
-  if (ctx && ctx.state === 'suspended') {
-    ctx.resume().then(() => {
-      // Play a silent buffer to truly unlock on some browsers
-      const buf = ctx.createBuffer(1, 1, 22050);
-      const src = ctx.createBufferSource();
-      src.buffer = buf;
-      src.connect(ctx.destination);
-      src.start(0);
-    });
+  if (_alarmCtx) {
+    try { _alarmCtx.close(); } catch (_) {}
+    _alarmCtx = null;
   }
 };
 
-// Attach unlock to the first click/keydown globally
-if (typeof window !== 'undefined') {
-  const unlock = () => {
-    unlockAudio();
-    window.removeEventListener('click', unlock);
-    window.removeEventListener('keydown', unlock);
-    window.removeEventListener('touchstart', unlock);
-  };
-  window.addEventListener('click', unlock);
-  window.addEventListener('keydown', unlock);
-  window.addEventListener('touchstart', unlock);
-}
-
-// ─── Alarm oscillator loop ────────────────────────────────────────────────────
 const startAlarm = () => {
-  // Use a separate owned AudioContext so closing it kills all audio instantly
-  const AudioCtx = window.AudioContext || window.webkitAudioContext;
-  if (!AudioCtx) return () => {};
-  const ctx = new AudioCtx();
+  // Kill any existing alarm first — guaranteed clean slate
+  stopAlarm();
 
-  let timeoutId = null;
-  let stopped = false;
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtx) return;
+
+  _alarmCtx = new AudioCtx();
+  _alarmStopped = false;
   let iter = 0;
 
-  const scheduleBeep = () => {
-    if (stopped) return;
+  const beep = () => {
+    if (_alarmStopped || !_alarmCtx) return;
 
-    const gainNode = ctx.createGain();
-    gainNode.gain.setValueAtTime(0.7, ctx.currentTime);
-    gainNode.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.22);
-    gainNode.connect(ctx.destination);
+    const gain = _alarmCtx.createGain();
+    gain.gain.setValueAtTime(0.8, _alarmCtx.currentTime);
+    gain.gain.linearRampToValueAtTime(0, _alarmCtx.currentTime + 0.22);
+    gain.connect(_alarmCtx.destination);
 
-    const osc = ctx.createOscillator();
+    const osc = _alarmCtx.createOscillator();
     osc.type = 'square';
-    osc.frequency.setValueAtTime(iter % 2 === 0 ? 960 : 720, ctx.currentTime);
-    osc.connect(gainNode);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.25);
-
+    osc.frequency.setValueAtTime(iter % 2 === 0 ? 960 : 720, _alarmCtx.currentTime);
+    osc.connect(gain);
+    osc.start(_alarmCtx.currentTime);
+    osc.stop(_alarmCtx.currentTime + 0.25);
     iter++;
-    // Store the timeout ID so we can cancel it
-    timeoutId = setTimeout(scheduleBeep, 340);
+
+    _alarmTimeoutId = setTimeout(beep, 340);
   };
 
-  if (ctx.state === 'suspended') {
-    ctx.resume().then(scheduleBeep);
+  if (_alarmCtx.state === 'suspended') {
+    _alarmCtx.resume().then(beep);
   } else {
-    scheduleBeep();
+    beep();
   }
 
-  // Return a stop function that guarantees silence immediately
-  return () => {
-    stopped = true;
-    if (timeoutId !== null) {
-      clearTimeout(timeoutId);
-      timeoutId = null;
-    }
-    // Close the context to kill any in-flight oscillators
-    ctx.close().catch(() => {});
-  };
+  if (navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 500]);
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
 const EmergencyAlarm = ({ alarm, onDismiss, sendCommand }) => {
-  const stopAlarmRef = useRef(null);
   const [elapsed, setElapsed] = useState(0);
-  const [audioBlocked, setAudioBlocked] = useState(false);
 
   useEffect(() => {
     if (!alarm) return;
 
-    // Vibrate device (mobile)
-    if (navigator.vibrate) {
-      navigator.vibrate([500, 200, 500, 200, 500]);
-    }
+    startAlarm();
 
-    // Start alarm
-    const ctx = getAudioCtx();
-    if (ctx && ctx.state === 'suspended') setAudioBlocked(true);
-    stopAlarmRef.current = startAlarm();
-
-    // Elapsed timer
     const timer = setInterval(() => setElapsed(s => s + 1), 1000);
 
+    // Cleanup: stop alarm if component unmounts without dismiss
     return () => {
-      if (stopAlarmRef.current) stopAlarmRef.current();
+      stopAlarm();
       clearInterval(timer);
     };
   }, [alarm?.patientId]);
 
   const handleDismiss = () => {
-    if (stopAlarmRef.current) stopAlarmRef.current();
-    // Also clear the emergency on the server so patient banner and all caretaker banners clear
+    // Stop alarm immediately — no exceptions
+    stopAlarm();
+    // Clear server-side emergency so all banners disappear
     if (sendCommand && alarm?.patientId) {
       sendCommand({ action: 'clear_emergency', patientId: alarm.patientId });
     }
     onDismiss();
-  };
-
-  const handleEnableSound = () => {
-    unlockAudio();
-    setAudioBlocked(false);
-    stopAlarmRef.current = startAlarm();
   };
 
   if (!alarm) return null;
@@ -145,15 +96,14 @@ const EmergencyAlarm = ({ alarm, onDismiss, sendCommand }) => {
   return (
     <div style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      backgroundColor: 'rgba(0,0,0,0.85)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       zIndex: 99999,
       animation: 'alarmPulse 1s ease-in-out infinite',
     }}>
       <style>{`
         @keyframes alarmPulse {
-          0%, 100% { background-color: rgba(0,0,0,0.85); }
-          50% { background-color: rgba(180,0,0,0.85); }
+          0%, 100% { background-color: rgba(0,0,0,0.88); }
+          50% { background-color: rgba(180,0,0,0.88); }
         }
         @keyframes shake {
           0%, 100% { transform: translateX(0); }
@@ -193,28 +143,13 @@ const EmergencyAlarm = ({ alarm, onDismiss, sendCommand }) => {
           📍 {alarm.locationName}
         </p>
 
-        {/* Sound blocked banner */}
-        {audioBlocked && (
-          <button
-            onClick={handleEnableSound}
-            style={{
-              display: 'block', width: '100%', marginBottom: '16px',
-              padding: '12px', background: '#f59e0b', color: 'black',
-              border: 'none', borderRadius: '10px', fontWeight: 700,
-              fontSize: '0.9rem', cursor: 'pointer'
-            }}
-          >
-            🔇 Browser blocked sound — Tap here to enable alarm audio
-          </button>
-        )}
-
         {/* Vitals Grid */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '24px' }}>
           {[
-            { label: 'Heart Rate',       value: `${alarm.status?.hr || '--'} BPM`, icon: '💓' },
-            { label: 'Blood Pressure',   value: alarm.status?.bp || '--',           icon: '🩸' },
-            { label: 'SpO₂',             value: `${alarm.status?.spO2 || '--'}%`,   icon: '🫁' },
-            { label: 'Temperature',      value: `${alarm.status?.temp || '--'}°C`,  icon: '🌡️' },
+            { label: 'Heart Rate',     value: `${alarm.status?.hr || '--'} BPM`, icon: '💓' },
+            { label: 'Blood Pressure', value: alarm.status?.bp || '--',           icon: '🩸' },
+            { label: 'SpO₂',           value: `${alarm.status?.spO2 || '--'}%`,   icon: '🫁' },
+            { label: 'Temperature',    value: `${alarm.status?.temp || '--'}°C`,  icon: '🌡️' },
           ].map(v => (
             <div key={v.label} style={{
               background: 'rgba(239,68,68,0.15)',
@@ -244,21 +179,20 @@ const EmergencyAlarm = ({ alarm, onDismiss, sendCommand }) => {
           Alert triggered {formatElapsed(elapsed)}
         </div>
 
-        {/* Action Buttons */}
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <button
-            onClick={handleDismiss}
-            style={{
-              flex: 1, padding: '18px', background: '#ef4444',
-              color: 'white', border: '2px solid rgba(255,255,255,0.3)',
-              borderRadius: '12px', fontSize: '1.05rem', fontWeight: 800,
-              cursor: 'pointer', letterSpacing: '0.5px',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.4)'
-            }}
-          >
-            ✅ Acknowledged and Cleared
-          </button>
-        </div>
+        {/* THE BUTTON */}
+        <button
+          onClick={handleDismiss}
+          style={{
+            width: '100%', padding: '20px',
+            background: '#16a34a',
+            color: 'white', border: '2px solid rgba(255,255,255,0.3)',
+            borderRadius: '14px', fontSize: '1.15rem', fontWeight: 800,
+            cursor: 'pointer', letterSpacing: '0.5px',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.5)'
+          }}
+        >
+          ✅ Acknowledged and Cleared — Stop Alarm
+        </button>
       </div>
     </div>
   );
