@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { HeartPulse, Activity, AlertTriangle, User, PhoneCall, Plus, CheckCircle2, Circle, Clock, Info, ChevronDown, ChevronRight, MapPin } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import MetricCard from '../components/MetricCard';
@@ -19,6 +19,11 @@ const PatientDashboard = ({
   const [userCoords, setUserCoords] = useState(null);
   const [userAddress, setUserAddress] = useState('Locating...');
   const [locationStatus, setLocationStatus] = useState('checking'); // 'checking', 'granted', 'denied', 'unsupported'
+
+  // Alarm audio state (patient side)
+  const alarmStopRef = useRef(null);
+  const [alarmPlaying, setAlarmPlaying] = useState(false);
+
 
   // Reverse Geocode Helper
   const reverseGeocode = async (lat, lng) => {
@@ -74,12 +79,47 @@ const PatientDashboard = ({
 
   if (!patient) return <div style={{padding: '40px', textAlign: 'center'}}>Loading Patient Data...</div>;
 
+  // ─── Alarm helpers (patient side) ────────────────────────────────────
+  const playAlarm = () => {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    let running = true;
+    let iter = 0;
+    const scheduleBeep = () => {
+      if (!running) return;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.7, ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.22);
+      gain.connect(ctx.destination);
+      const osc = ctx.createOscillator();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(iter % 2 === 0 ? 960 : 720, ctx.currentTime);
+      osc.connect(gain);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.25);
+      iter++;
+      setTimeout(scheduleBeep, 340);
+    };
+    if (navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 500]);
+    scheduleBeep();
+    alarmStopRef.current = () => { running = false; ctx.close(); };
+    setAlarmPlaying(true);
+  };
+
+  const stopAlarm = () => {
+    if (alarmStopRef.current) { alarmStopRef.current(); alarmStopRef.current = null; }
+    setAlarmPlaying(false);
+  };
+
   const triggerEmergency = () => {
     sendCommand({ action: 'trigger_emergency', patientId: patient.id, severity: 'high' });
+    playAlarm();
   };
 
   const clearEmergency = () => {
     sendCommand({ action: 'clear_emergency', patientId: patient.id });
+    stopAlarm();
   };
 
   const addMedication = (e) => {
@@ -97,6 +137,10 @@ const PatientDashboard = ({
 
   return (
     <div className="dashboard-content-wrapper">
+      <style>{`
+        @keyframes alarmPulse { 0%, 100% { background-color: #dc2626; } 50% { background-color: #7f1d1d; } }
+        @keyframes btnPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(220,38,38,0.7); } 70% { box-shadow: 0 0 0 10px rgba(220,38,38,0); } }
+      `}</style>
       <header className="dashboard-header">
         <div className="header-brand">
           <button className="icon-btn" onClick={() => navigate('/')} style={{marginRight: '8px'}}>&larr;</button>
@@ -110,9 +154,19 @@ const PatientDashboard = ({
         <div style={{display: 'flex', gap: '16px', alignItems: 'center'}}>
           {/* INTERACTIVE EMERGENCY BUTTON - ONLY FOR PATIENT ROLE */}
           {role === 'patient' && (
-            <button className="btn-primary" style={{backgroundColor: 'var(--accent-red)', padding: '10px 24px', display: 'flex', gap: '8px'}} onClick={patient.emergencyTriggered ? clearEmergency : triggerEmergency}>
+            <button
+              className="btn-primary"
+              style={{
+                backgroundColor: patient.emergencyTriggered ? '#7f1d1d' : 'var(--accent-red)',
+                padding: '10px 24px',
+                display: 'flex',
+                gap: '8px',
+                animation: patient.emergencyTriggered ? 'btnPulse 1.5s ease-in-out infinite' : 'none'
+              }}
+              onClick={patient.emergencyTriggered ? clearEmergency : triggerEmergency}
+            >
               <AlertTriangle size={20} />
-              {patient.emergencyTriggered ? 'Cancel Emergency' : 'Emergency Alert'}
+              {patient.emergencyTriggered ? '🛑 Stop Emergency & Alarm' : '🚨 Emergency Alert'}
             </button>
           )}
         </div>
@@ -120,8 +174,36 @@ const PatientDashboard = ({
 
       {/* EMERGENCY NOTIFICATION BANNER */}
       {patient.emergencyTriggered && (
-        <div style={{backgroundColor: 'var(--status-critical)', color: 'white', padding: '16px', textAlign: 'center', fontWeight: 'bold', fontSize: '1.1rem', marginBottom: '24px'}}>
-          EMERGENCY ALERT SENT: Distributing to the nearest available caretaker. Help is on the way.
+        <div style={{
+          backgroundColor: '#dc2626',
+          color: 'white',
+          padding: '16px 24px',
+          fontWeight: 'bold',
+          fontSize: '1.1rem',
+          marginBottom: '24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          animation: 'alarmPulse 1.5s ease-in-out infinite'
+        }}>
+          <span>🚨 EMERGENCY ALERT SENT — Nearest caretaker has been notified. Help is on the way.</span>
+          <button
+            onClick={clearEmergency}
+            style={{
+              backgroundColor: 'white',
+              color: '#dc2626',
+              border: 'none',
+              borderRadius: '8px',
+              padding: '8px 20px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              fontSize: '0.9rem',
+              flexShrink: 0,
+              marginLeft: '16px'
+            }}
+          >
+            🛑 Stop Alarm
+          </button>
         </div>
       )}
 

@@ -286,7 +286,55 @@ const CaregiverDashboard = ({
         </div>
       </header>
 
-      {/* TARGETED EMERGENCY ALERT */}
+      {/* PERSISTENT ACTIVE EMERGENCY BANNER — visible to any logged-in caretaker */}
+      {activeEmergency && (
+        <div style={{
+          backgroundColor: '#dc2626',
+          color: 'white',
+          padding: '16px 28px',
+          marginBottom: '16px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '16px',
+          animation: 'alarmPulse 1.5s ease-in-out infinite',
+          zIndex: 100,
+          position: 'relative'
+        }}>
+          <style>{`@keyframes alarmPulse { 0%, 100% { background-color: #dc2626; } 50% { background-color: #7f1d1d; } }`}</style>
+          <div style={{display: 'flex', alignItems: 'center', gap: '16px'}}>
+            <AlertTriangle size={28} />
+            <div>
+              <div style={{fontWeight: 800, fontSize: '1.1rem'}}>🚨 ACTIVE EMERGENCY — {activeEmergency.patientName}</div>
+              <div style={{fontSize: '0.9rem', opacity: 0.9}}>
+                📍 {activeEmergency.locationName} &nbsp;|&nbsp;
+                HR: {activeEmergency.status?.hr} BPM &nbsp;|&nbsp;
+                SpO₂: {activeEmergency.status?.spO2}% &nbsp;|&nbsp;
+                Assigned to: {activeEmergency.assignedCaretakerId === caretakerId ? 'You' : activeEmergency.assignedCaretakerId}
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => sendCommand({ action: 'clear_emergency', patientId: activeEmergency.patientId })}
+            style={{
+              backgroundColor: 'white',
+              color: '#dc2626',
+              border: 'none',
+              borderRadius: '10px',
+              padding: '10px 24px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              fontSize: '0.95rem',
+              flexShrink: 0,
+              whiteSpace: 'nowrap'
+            }}
+          >
+            🛑 Stop Alarm & Clear
+          </button>
+        </div>
+      )}
+
+      {/* TARGETED EMERGENCY ALERT (legacy detailed dispatch) */}
       {activeEmergency && activeEmergency.assignedCaretakerId === caretakerId && (
         <div style={{backgroundColor: 'var(--status-critical)', color: 'white', padding: '24px', borderRadius: '12px', marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 4px 12px rgba(220, 53, 69, 0.3)'}}>
           <div style={{display: 'flex', alignItems: 'center', gap: '16px'}}>
@@ -304,7 +352,7 @@ const CaregiverDashboard = ({
                </p>
              </div>
           </div>
-          <button className="btn-secondary" style={{backgroundColor: 'white', color: 'var(--status-critical)', border: 'none'}} onClick={clearFallGlobal}>Acknowledge & Clear</button>
+          <button className="btn-secondary" style={{backgroundColor: 'white', color: 'var(--status-critical)', border: 'none'}} onClick={clearFallGlobal}>Acknowledge &amp; Clear</button>
         </div>
       )}
 
