@@ -44,14 +44,17 @@ if (typeof window !== 'undefined') {
 
 // ─── Alarm oscillator loop ────────────────────────────────────────────────────
 const startAlarm = () => {
-  const ctx = getAudioCtx();
-  if (!ctx) return () => {};
+  // Use a separate owned AudioContext so closing it kills all audio instantly
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtx) return () => {};
+  const ctx = new AudioCtx();
 
-  let running = true;
+  let timeoutId = null;
+  let stopped = false;
   let iter = 0;
 
   const scheduleBeep = () => {
-    if (!running) return;
+    if (stopped) return;
 
     const gainNode = ctx.createGain();
     gainNode.gain.setValueAtTime(0.7, ctx.currentTime);
@@ -60,24 +63,32 @@ const startAlarm = () => {
 
     const osc = ctx.createOscillator();
     osc.type = 'square';
-    // Alternate between two tones like a siren
     osc.frequency.setValueAtTime(iter % 2 === 0 ? 960 : 720, ctx.currentTime);
     osc.connect(gainNode);
     osc.start(ctx.currentTime);
     osc.stop(ctx.currentTime + 0.25);
 
     iter++;
-    setTimeout(scheduleBeep, 340);
+    // Store the timeout ID so we can cancel it
+    timeoutId = setTimeout(scheduleBeep, 340);
   };
 
-  // If AudioContext was already suspended (should be unlocked by now), resume first
   if (ctx.state === 'suspended') {
     ctx.resume().then(scheduleBeep);
   } else {
     scheduleBeep();
   }
 
-  return () => { running = false; };
+  // Return a stop function that guarantees silence immediately
+  return () => {
+    stopped = true;
+    if (timeoutId !== null) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+    }
+    // Close the context to kill any in-flight oscillators
+    ctx.close().catch(() => {});
+  };
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────

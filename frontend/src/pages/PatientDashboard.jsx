@@ -20,9 +20,8 @@ const PatientDashboard = ({
   const [userAddress, setUserAddress] = useState('Locating...');
   const [locationStatus, setLocationStatus] = useState('checking'); // 'checking', 'granted', 'denied', 'unsupported'
 
-  // Alarm audio state (patient side)
+  // Alarm audio - driven by useEffect so it auto-stops when server clears emergency
   const alarmStopRef = useRef(null);
-  const [alarmPlaying, setAlarmPlaying] = useState(false);
 
 
   // Reverse Geocode Helper
@@ -77,49 +76,63 @@ const PatientDashboard = ({
     };
   }, [patient?.id, role]);
 
+  // Auto-start / auto-stop alarm based on emergencyTriggered from server state
+  React.useEffect(() => {
+    if (role !== 'patient') return;
+    if (!patient) return;
+
+    if (patient.emergencyTriggered) {
+      // Only start if not already running
+      if (!alarmStopRef.current) {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        let timeoutId = null;
+        let stopped = false;
+        let iter = 0;
+        const scheduleBeep = () => {
+          if (stopped) return;
+          const gain = ctx.createGain();
+          gain.gain.setValueAtTime(0.7, ctx.currentTime);
+          gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.22);
+          gain.connect(ctx.destination);
+          const osc = ctx.createOscillator();
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(iter % 2 === 0 ? 960 : 720, ctx.currentTime);
+          osc.connect(gain);
+          osc.start(ctx.currentTime);
+          osc.stop(ctx.currentTime + 0.25);
+          iter++;
+          timeoutId = setTimeout(scheduleBeep, 340);
+        };
+        if (navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 500]);
+        if (ctx.state === 'suspended') ctx.resume().then(scheduleBeep); else scheduleBeep();
+        alarmStopRef.current = () => {
+          stopped = true;
+          if (timeoutId !== null) { clearTimeout(timeoutId); timeoutId = null; }
+          ctx.close().catch(() => {});
+        };
+      }
+    } else {
+      // Emergency cleared — stop alarm immediately
+      if (alarmStopRef.current) {
+        alarmStopRef.current();
+        alarmStopRef.current = null;
+      }
+    }
+  }, [patient?.emergencyTriggered, role]);
+
   if (!patient) return <div style={{padding: '40px', textAlign: 'center'}}>Loading Patient Data...</div>;
 
   // ─── Alarm helpers (patient side) ────────────────────────────────────
-  const playAlarm = () => {
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    if (!AudioCtx) return;
-    const ctx = new AudioCtx();
-    let running = true;
-    let iter = 0;
-    const scheduleBeep = () => {
-      if (!running) return;
-      const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0.7, ctx.currentTime);
-      gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.22);
-      gain.connect(ctx.destination);
-      const osc = ctx.createOscillator();
-      osc.type = 'square';
-      osc.frequency.setValueAtTime(iter % 2 === 0 ? 960 : 720, ctx.currentTime);
-      osc.connect(gain);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.25);
-      iter++;
-      setTimeout(scheduleBeep, 340);
-    };
-    if (navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 500]);
-    scheduleBeep();
-    alarmStopRef.current = () => { running = false; ctx.close(); };
-    setAlarmPlaying(true);
-  };
-
-  const stopAlarm = () => {
-    if (alarmStopRef.current) { alarmStopRef.current(); alarmStopRef.current = null; }
-    setAlarmPlaying(false);
-  };
-
   const triggerEmergency = () => {
     sendCommand({ action: 'trigger_emergency', patientId: patient.id, severity: 'high' });
-    playAlarm();
+    // Alarm auto-starts via useEffect watching patient.emergencyTriggered
   };
 
   const clearEmergency = () => {
     sendCommand({ action: 'clear_emergency', patientId: patient.id });
-    stopAlarm();
+    // Alarm auto-stops via useEffect watching patient.emergencyTriggered
   };
 
   const addMedication = (e) => {
