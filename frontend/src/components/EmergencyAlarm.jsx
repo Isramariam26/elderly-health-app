@@ -2,9 +2,22 @@ import React, { useEffect, useState } from 'react';
 
 // ─── MODULE-LEVEL SINGLETON ALARM ─────────────────────────────────────────────
 // Only ONE alarm can play at a time. Any call to stopAlarm() kills it instantly.
+// ─── MODULE-LEVEL SINGLETON ALARM ─────────────────────────────────────────────
+// We keep the AudioContext ALIVE once created. Closing it can cause the browser
+// to forget the user-gesture authorization.
 let _alarmCtx = null;
 let _alarmStopped = true;
 let _alarmTimeoutId = null;
+
+const getAudioCtx = () => {
+  if (!_alarmCtx) {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (AudioCtx) {
+      _alarmCtx = new AudioCtx();
+    }
+  }
+  return _alarmCtx;
+};
 
 const stopAlarm = () => {
   _alarmStopped = true;
@@ -12,61 +25,54 @@ const stopAlarm = () => {
     clearTimeout(_alarmTimeoutId);
     _alarmTimeoutId = null;
   }
-  if (_alarmCtx) {
-    try { _alarmCtx.close(); } catch (_) {}
-    _alarmCtx = null;
-  }
+  // DO NOT close the context here, just let it sit idle.
 };
 
 const startAlarm = () => {
-  // Kill any existing alarm first — guaranteed clean slate
-  stopAlarm();
-
-  const AudioCtx = window.AudioContext || window.webkitAudioContext;
-  if (!AudioCtx) return;
-
-  _alarmCtx = new AudioCtx();
   _alarmStopped = false;
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+
+  // Attempt to resume immediately
+  if (ctx.state === 'suspended') {
+    ctx.resume().catch(() => {
+      console.warn("AudioContext suspended. Waiting for user interaction to play sound.");
+    });
+  }
+
   let iter = 0;
-
   const beep = () => {
-    if (_alarmStopped || !_alarmCtx) return;
+    if (_alarmStopped || !ctx) return;
 
-    const gain = _alarmCtx.createGain();
-    gain.gain.setValueAtTime(0.8, _alarmCtx.currentTime);
-    gain.gain.linearRampToValueAtTime(0, _alarmCtx.currentTime + 0.22);
-    gain.connect(_alarmCtx.destination);
+    // Double check state in the loop
+    if (ctx.state === 'running') {
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.8, ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.22);
+      gain.connect(ctx.destination);
 
-    const osc = _alarmCtx.createOscillator();
-    osc.type = 'square';
-    osc.frequency.setValueAtTime(iter % 2 === 0 ? 960 : 720, _alarmCtx.currentTime);
-    osc.connect(gain);
-    osc.start(_alarmCtx.currentTime);
-    osc.stop(_alarmCtx.currentTime + 0.25);
-    iter++;
+      const osc = ctx.createOscillator();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(iter % 2 === 0 ? 960 : 720, ctx.currentTime);
+      osc.connect(gain);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.25);
+      iter++;
+    }
 
     _alarmTimeoutId = setTimeout(beep, 340);
   };
 
-  if (_alarmCtx.state === 'suspended') {
-    _alarmCtx.resume().catch(() => {
-      console.warn("Autoplay blocked. Sound will play upon next user interaction.");
-    });
-  }
-  
-  // ALWAYS start the loop. Even if suspended, the JS loop will keep scheduling oscillators.
-  // When the context is resumed by a user click, it will instantly start producing sound.
   beep();
 
-  // Attach a global listener to resume audio upon ANY interaction if it was blocked
-  const unlockAudio = () => {
-    if (_alarmCtx && _alarmCtx.state === 'suspended') {
-      _alarmCtx.resume();
+  // Interaction handlers to ensure sound starts the moment the user touches the app
+  const unlock = () => {
+    if (ctx.state === 'suspended') {
+      ctx.resume().then(() => console.log("AudioContext resumed via interaction"));
     }
   };
-  document.addEventListener('click', unlockAudio, { once: true });
-  document.addEventListener('keydown', unlockAudio, { once: true });
-  document.addEventListener('touchstart', unlockAudio, { once: true });
+  window.addEventListener('click', unlock, { once: true });
+  window.addEventListener('keydown', unlock, { once: true });
 
   if (navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 500]);
 };

@@ -3,6 +3,23 @@ import { HeartPulse, Activity, AlertTriangle, User, PhoneCall, Plus, CheckCircle
 import { useNavigate } from 'react-router-dom';
 import MetricCard from '../components/MetricCard';
 
+// ─── MODULE-LEVEL SINGLETON FOR PATIENT ALARM ────────────────────────────────
+// Keeping the context alive preserves the browser's user-gesture authorization.
+let _patientAlarmCtx = null;
+let _patientAlarmStopped = true;
+let _patientAlarmTimeoutId = null;
+
+const getPatientAudioCtx = () => {
+  if (!_patientAlarmCtx) {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (AudioCtx) {
+      _patientAlarmCtx = new AudioCtx();
+    }
+  }
+  return _patientAlarmCtx;
+};
+
+
 const PatientDashboard = ({ 
   globalState, 
   getHrStatus, 
@@ -81,65 +98,61 @@ const PatientDashboard = ({
 
   // Auto-start / auto-stop alarm based on emergencyTriggered from server state
   React.useEffect(() => {
-    if (role !== 'patient') return;
-    if (!patient) return;
+    if (role !== 'patient' || !patient) return;
 
     if (patient.emergencyTriggered) {
-      // Only start if not already running
-      if (!alarmStopRef.current) {
-        const AudioCtx = window.AudioContext || window.webkitAudioContext;
-        if (!AudioCtx) return;
-        const ctx = new AudioCtx();
-        let timeoutId = null;
-        let stopped = false;
+      if (_patientAlarmStopped) {
+        _patientAlarmStopped = false;
+        const ctx = getPatientAudioCtx();
+        if (!ctx) return;
+
+        if (ctx.state === 'suspended') {
+          ctx.resume().catch(() => console.warn("Patient Autoplay blocked."));
+        }
+
         let iter = 0;
         const scheduleBeep = () => {
-          if (stopped) return;
-          const gain = ctx.createGain();
-          gain.gain.setValueAtTime(0.7, ctx.currentTime);
-          gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.22);
-          gain.connect(ctx.destination);
-          const osc = ctx.createOscillator();
-          osc.type = 'square';
-          osc.frequency.setValueAtTime(iter % 2 === 0 ? 960 : 720, ctx.currentTime);
-          osc.connect(gain);
-          osc.start(ctx.currentTime);
-          osc.stop(ctx.currentTime + 0.25);
-          iter++;
-          timeoutId = setTimeout(scheduleBeep, 340);
+          if (_patientAlarmStopped || !ctx) return;
+          if (ctx.state === 'running') {
+            const gain = ctx.createGain();
+            gain.gain.setValueAtTime(0.7, ctx.currentTime);
+            gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.22);
+            gain.connect(ctx.destination);
+            const osc = ctx.createOscillator();
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(iter % 2 === 0 ? 960 : 720, ctx.currentTime);
+            osc.connect(gain);
+            osc.start(ctx.currentTime);
+            osc.stop(ctx.currentTime + 0.25);
+            iter++;
+          }
+          _patientAlarmTimeoutId = setTimeout(scheduleBeep, 340);
         };
+
         if (navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 500]);
-        
-        // Handle Autoplay Policy restrictions gracefully
-        if (ctx.state === 'suspended') {
-          ctx.resume().catch(() => console.warn("Autoplay blocked. Sound will play on next interaction."));
-        }
-        
-        // Always schedule beeps (runs in JS even if AudioCtx is muted by browser)
         scheduleBeep();
 
-        // Attach global listeners to unlock the audio the second the user interacts with the page
-        const unlockPatientAudio = () => {
-          if (ctx && ctx.state === 'suspended') ctx.resume();
+        const unlockPatient = () => {
+          if (ctx.state === 'suspended') ctx.resume();
         };
-        document.addEventListener('click', unlockPatientAudio, { once: true });
-        document.addEventListener('keydown', unlockPatientAudio, { once: true });
-        document.addEventListener('touchstart', unlockPatientAudio, { once: true });
+        window.addEventListener('click', unlockPatient, { once: true });
+        window.addEventListener('keydown', unlockPatient, { once: true });
+
         alarmStopRef.current = () => {
-          stopped = true;
-          if (timeoutId !== null) { clearTimeout(timeoutId); timeoutId = null; }
-          ctx.close().catch(() => {});
+          _patientAlarmStopped = true;
+          if (_patientAlarmTimeoutId !== null) {
+            clearTimeout(_patientAlarmTimeoutId);
+            _patientAlarmTimeoutId = null;
+          }
         };
       }
     } else {
-      // Emergency cleared — stop alarm immediately
       if (alarmStopRef.current) {
         alarmStopRef.current();
         alarmStopRef.current = null;
       }
     }
 
-    // Unmount cleanup: halt any playing audio
     return () => {
       if (alarmStopRef.current) {
         alarmStopRef.current();
