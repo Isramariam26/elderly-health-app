@@ -36,30 +36,32 @@ const startAlarm = () => {
     if (_alarmStopped || !ctx) return;
 
     if (ctx.state === 'running') {
-      const duration = 0.5;
+      const duration = 0.4;
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
 
-      osc.type = 'triangle';
-      // Siren sweep: 600Hz to 1200Hz
-      osc.frequency.setValueAtTime(600, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + duration);
-
-      gain.gain.setValueAtTime(0, ctx.currentTime);
-      gain.gain.linearRampToValueAtTime(1, ctx.currentTime + 0.05);
-      gain.gain.linearRampToValueAtTime(0, ctx.currentTime + duration);
+      osc.type = 'square'; // Switch to square for more punch
+      osc.frequency.setValueAtTime(iter % 2 === 0 ? 900 : 600, ctx.currentTime);
+      
+      gain.gain.setValueAtTime(0.5, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
 
       osc.connect(gain);
       gain.connect(ctx.destination);
 
       osc.start(ctx.currentTime);
       osc.stop(ctx.currentTime + duration);
+      iter++;
+    } else {
+      ctx.resume().catch(() => {});
     }
 
-    _alarmTimeoutId = setTimeout(playSiren, 600);
+    _alarmTimeoutId = setTimeout(playSiren, 450);
   };
 
+  let iter = 0;
   playSiren();
+
 
   const unlock = () => { if (ctx.state === 'suspended') ctx.resume(); };
   window.addEventListener('click', unlock, { once: true });
@@ -101,8 +103,16 @@ const EmergencyAlarm = ({ alarm, onDismiss, sendCommand }) => {
 
   const unlockAudioManually = () => {
     const ctx = getAudioCtx();
-    if (ctx) ctx.resume();
+    if (ctx) {
+      if (ctx.state === 'suspended') {
+        ctx.resume().then(() => setAudioState('running')).catch(e => console.error("Manual resume failed:", e));
+      } else {
+        // If already running but silent, maybe re-trigger the startAlarm
+        startAlarm();
+      }
+    }
   };
+
 
   if (!alarm) return null;
 

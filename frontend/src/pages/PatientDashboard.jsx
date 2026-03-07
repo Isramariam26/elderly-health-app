@@ -7,8 +7,10 @@ import MetricCard from '../components/MetricCard';
 let _patientAlarmCtx = null;
 let _patientAlarmStopped = true;
 let _patientAlarmTimeoutId = null;
+let _patientManualSilence = false; // Prevents auto-restart if user clicked stop
 
 const getPatientAudioCtx = () => {
+
   if (!_patientAlarmCtx) {
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
     if (AudioCtx) _patientAlarmCtx = new AudioCtx();
@@ -18,11 +20,13 @@ const getPatientAudioCtx = () => {
 
 const stopPatientAlarm = () => {
   _patientAlarmStopped = true;
+  _patientManualSilence = true; 
   if (_patientAlarmTimeoutId !== null) {
     clearTimeout(_patientAlarmTimeoutId);
     _patientAlarmTimeoutId = null;
   }
 };
+
 
 
 
@@ -109,8 +113,9 @@ const PatientDashboard = ({
     if (role !== 'patient' || !patient) return;
 
     if (patient.emergencyTriggered) {
-      if (_patientAlarmStopped) {
+      if (_patientAlarmStopped && !_patientManualSilence) {
         _patientAlarmStopped = false;
+
         const ctx = getPatientAudioCtx();
         if (!ctx) return;
 
@@ -142,9 +147,11 @@ const PatientDashboard = ({
 
         const unlockPatient = () => { if (ctx.state === 'suspended') ctx.resume(); };
         window.addEventListener('click', unlockPatient, { once: true });
+        window.addEventListener('click', unlockPatient, { once: true });
         window.addEventListener('keydown', unlockPatient, { once: true });
       }
     } else {
+      _patientManualSilence = false; // Reset for next emergency
       stopPatientAlarm();
     }
 
@@ -158,6 +165,19 @@ const PatientDashboard = ({
       clearInterval(checkAudio);
     };
   }, [patient?.emergencyTriggered, role]);
+
+  const unlockPatientAudioManual = () => {
+    const ctx = getPatientAudioCtx();
+    if (ctx) {
+      if (ctx.state === 'suspended') {
+        ctx.resume().then(() => setAudioState('running'));
+      } else {
+        _patientManualSilence = false; // Allow re-trigger if they want to hear it again
+        _patientAlarmStopped = true; // Force a restart of the effect logic next tick
+      }
+    }
+  };
+
 
   if (!patient) return <div style={{padding: '40px', textAlign: 'center'}}>Loading Patient Data...</div>;
 
@@ -239,15 +259,18 @@ const PatientDashboard = ({
         }}>
           <div style={{fontSize: '1.4rem', textAlign: 'center'}}>🚨 EMERGENCY ALERT SENT</div>
           
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: '8px',
-            padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem',
-            background: audioState === 'running' ? 'rgba(34,197,94,0.3)' : 'rgba(234,179,8,0.3)',
-            border: `1px solid ${audioState === 'running' ? '#4ade80' : '#fde047'}`,
-            color: 'white'
-          }}>
-            {audioState === 'running' ? '🔊 Alarm is ringing' : '🔇 Browser muted sound — Click anywhere to activate'}
+          <div 
+            onClick={unlockPatientAudioManual}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem',
+              background: audioState === 'running' ? 'rgba(34,197,94,0.3)' : 'rgba(234,179,8,0.3)',
+              border: `1px solid ${audioState === 'running' ? '#4ade80' : '#fde047'}`,
+              color: 'white', cursor: 'pointer'
+            }}>
+            {audioState === 'running' ? '🔊 Alarm is ringing' : '🔇 Browser muted sound — Click to activate'}
           </div>
+
 
           <p style={{margin: 0, fontWeight: 400, fontSize: '0.95rem', textAlign: 'center'}}>Nearest caretaker has been notified. Help is on the way.</p>
 
