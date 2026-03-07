@@ -320,11 +320,12 @@ const PatientDashboard = ({
               <div style={{fontSize: '1rem', color: 'var(--text-muted)'}}>Past Medications (Stopped)</div>
             </div>
             <div style={{display: 'flex', flexDirection: 'column', gap: '8px', opacity: 0.7}}>
-              {patient.pastMedications.map((med, i) => (
+              {patient.pastMedications && patient.pastMedications.map((med, i) => (
                  <div key={i} className="list-item" style={{padding: '12px'}}>
                    {med}
                  </div>
               ))}
+              {!patient.pastMedications && <div className="list-item" style={{padding: '12px', fontSize: '0.85rem', color: 'var(--text-muted)'}}>No past medication records.</div>}
             </div>
             
           </section>
