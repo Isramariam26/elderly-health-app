@@ -6,7 +6,6 @@ import Login from './pages/Login';
 import PatientDashboard from './pages/PatientDashboard';
 import CaregiverDashboard from './pages/CaregiverDashboard';
 import './index.css';
-import EmergencyAlarm from './components/EmergencyAlarm';
 
 function App() {
   const [globalState, setGlobalState] = useState({ patients: [], caretakers: [], activeEmergency: null });
@@ -87,14 +86,6 @@ function App() {
   return (
     <Router>
       <div className="app-container">
-        {/* Global Emergency Alarm Popup - shows for the targeted caregiver only */}
-        {activeAlarm && (
-          <EmergencyAlarm
-            alarm={activeAlarm}
-            onDismiss={() => setActiveAlarm(null)}
-            sendCommand={sendCommand}
-          />
-        )}
         <Routes>
           <Route path="/" element={<RoleSelection />} />
           <Route path="/portal-selection" element={<PortalSelection />} />
@@ -129,6 +120,8 @@ function App() {
               getSpo2Status={getSpo2Status} 
               connectionStatus={connectionStatus}
               sendCommand={sendCommand}
+              activeAlarm={activeAlarm}
+              setActiveAlarm={setActiveAlarm}
             />
           } />
 

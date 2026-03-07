@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Activity, User, MapPin, HeartPulse, FileText, CheckCircle2, Circle, X, Calendar, AlertTriangle, Clock, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import MetricCard from '../components/MetricCard';
+import EmergencyAlarm from '../components/EmergencyAlarm';
 
 // Normalize coordinates to percentage for SVG Map
 const normalizeCoord = (val, min, max) => ((val - min) / (max - min)) * 100;
@@ -11,7 +12,9 @@ const CaregiverDashboard = ({
   getHrStatus, 
   getSpo2Status, 
   connectionStatus, 
-  sendCommand 
+  sendCommand,
+  activeAlarm,
+  setActiveAlarm
 }) => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('patients');
@@ -256,6 +259,15 @@ const CaregiverDashboard = ({
   return (
     <div className="dashboard-content-wrapper" style={{maxWidth: '1200px', margin: '0 auto'}}>
       
+      {/* Targeted Emergency Alarm Popup */}
+      {activeAlarm && (
+        <EmergencyAlarm
+          alarm={activeAlarm}
+          onDismiss={() => setActiveAlarm(null)}
+          sendCommand={sendCommand}
+        />
+      )}
+
       {/* Top Header */}
       <header className="nurse-header">
         <div style={{display: 'flex', alignItems: 'center', gap: '24px'}}>

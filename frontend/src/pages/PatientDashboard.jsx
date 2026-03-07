@@ -43,6 +43,9 @@ const PatientDashboard = ({
   React.useEffect(() => {
     if (!patient || role !== 'patient') return;
 
+    // Register as a patient to clear any previous caregiver sessions on this WebSocket
+    sendCommand({ action: 'register_client', caregiverId: null, role: 'patient' });
+
     let watchId;
     if ("geolocation" in navigator) {
       watchId = navigator.geolocation.watchPosition(
