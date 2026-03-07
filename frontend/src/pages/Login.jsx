@@ -33,27 +33,33 @@ const Login = ({ setLoggedInId }) => {
         setError('Invalid caregiver credentials. Pattern: -n1 / -demn1');
       }
     } else {
-      // Patient/Family Login logic: -c1/-demc1
-      const idMatch = userId.match(/^-c(\d+)$/);
-      const passMatch = password.match(/^-demc(\d+)$/);
-
+      // Patient/Family Login logic: Exact user request mapping
       let targetId = null;
 
-      if (idMatch && passMatch && idMatch[1] === passMatch[1]) {
-        const num = parseInt(idMatch[1]);
-        if (num >= 1 && num <= 10) {
-          targetId = `GF-0${num < 10 ? '0' : ''}${num}`;
-        }
-      } else if (userId === 'demo' && password === 'demo') {
-        targetId = 'GF-001';
-      }
+      // c1 - c3: Standard patterns
+      if (userId === '-c1' && password === '-demc1') targetId = 'GF-001';
+      else if (userId === '-c2' && password === '-demc2') targetId = 'GF-002';
+      else if (userId === '-c3' && password === '-demc3') targetId = 'GF-003';
+      // c4: Gopal Rao again
+      else if (userId === '-c4' && password === '-demc4') targetId = 'GF-003';
+      // c5 - c10: Shifted due to c4 Gopal Rao
+      else if (userId === '-c5' && password === '-demc5') targetId = 'GF-004';
+      else if (userId === '-c6' && password === '-demc6') targetId = 'GF-005';
+      else if (userId === '-c7' && password === '-demc7') targetId = 'GF-006';
+      else if (userId === '-c8' && password === '-demc8') targetId = 'GF-007';
+      else if (userId === '-c9' && password === '-demc9') targetId = 'GF-008';
+      else if (userId === '-c10' && password === '-demc10') targetId = 'GF-009';
+      // c11: Laxmibai Pawar with unique password
+      else if (userId === '-c11' && password === '-c11') targetId = 'GF-010';
+      // demo fallback
+      else if (userId === 'demo' && password === 'demo') targetId = 'GF-001';
 
       if (targetId) {
         sessionStorage.setItem('care_nest_id', targetId);
         setLoggedInId(targetId);
         navigate(role === 'family' ? '/family' : '/patient');
       } else {
-        setError('Invalid ID or Password. Pattern: -c1 / -demc1');
+        setError('Invalid ID or Password for this portal.');
       }
     }
   };

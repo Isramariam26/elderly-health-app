@@ -30,7 +30,7 @@ const state = {
     },
     {
       id: 'GF-002',
-      name: 'Savitribai Shinde',
+      name: 'Savitribai Shin',
       age: 72,
       condition: 'Hypertension',
       location: { name: 'Room 102', lat: 34.0758, lng: -118.3805 },
@@ -86,7 +86,7 @@ const state = {
     },
     {
       id: 'GF-007',
-      name: 'Balakrishna Iyer',
+      name: 'Balkrishna Iyer',
       age: 79,
       condition: 'Diabetes + Hypertension',
       location: { name: 'Room 107', lat: 34.0765, lng: -118.3820 },
