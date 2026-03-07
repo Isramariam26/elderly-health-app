@@ -17,10 +17,23 @@ const PatientDashboard = ({
   
   // Location and Permission state
   const [userCoords, setUserCoords] = useState(null);
+  const [userAddress, setUserAddress] = useState('Locating...');
   const [locationStatus, setLocationStatus] = useState('checking'); // 'checking', 'granted', 'denied', 'unsupported'
 
-  // For demo purposes, we log in as patient 'p1' (Arthur Dent)
-  const patient = globalState.patients?.find(p => p.id === 'p1');
+  // Reverse Geocode Helper
+  const reverseGeocode = async (lat, lng) => {
+    try {
+      const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`);
+      const data = await resp.json();
+      return data.display_name || 'Unknown Location';
+    } catch (e) {
+      console.warn("Geocoding failed:", e);
+      return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    }
+  };
+
+  // For demo purposes, we log in as patient 'GF-001' (Ramesh Patil)
+  const patient = globalState.patients?.find(p => p.id === 'GF-001');
   const caretakers = globalState.caretakers || [];
 
   React.useEffect(() => {
@@ -29,16 +42,20 @@ const PatientDashboard = ({
     let watchId;
     if ("geolocation" in navigator) {
       watchId = navigator.geolocation.watchPosition(
-        (position) => {
+        async (position) => {
           const { latitude, longitude } = position.coords;
           setUserCoords({ lat: latitude, lng: longitude });
           setLocationStatus('granted');
+
+          const address = await reverseGeocode(latitude, longitude);
+          setUserAddress(address);
 
           sendCommand({
             action: 'update_location',
             patientId: patient.id,
             lat: latitude,
-            lng: longitude
+            lng: longitude,
+            locationName: address
           });
         },
         (error) => {
@@ -117,9 +134,9 @@ const PatientDashboard = ({
             <MapPin size={22} color="var(--accent-blue)" />
             <div style={{display: 'flex', flexDirection: 'column'}}>
               <span style={{color: 'var(--text-main)'}}>{patient.location.name}</span>
-              {locationStatus === 'granted' && userCoords && (
+              {locationStatus === 'granted' && (
                 <span style={{fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400}}>
-                  Live GPS: {userCoords.lat.toFixed(4)}, {userCoords.lng.toFixed(4)}
+                  Live: {userAddress}
                 </span>
               )}
               {locationStatus === 'denied' && (

@@ -22,7 +22,20 @@ const CaregiverDashboard = ({
   const [now, setNow] = useState(new Date());
   // Location and Permission state
   const [userCoords, setUserCoords] = useState(null);
+  const [userAddress, setUserAddress] = useState('Locating...');
   const [locationStatus, setLocationStatus] = useState('checking'); // 'checking', 'granted', 'denied', 'unsupported'
+
+  // Reverse Geocode Helper
+  const reverseGeocode = async (lat, lng) => {
+    try {
+      const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`);
+      const data = await resp.json();
+      return data.display_name || 'Unknown Location';
+    } catch (e) {
+      console.warn("Geocoding failed:", e);
+      return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    }
+  };
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
@@ -63,16 +76,20 @@ const CaregiverDashboard = ({
     }
 
     const watchId = navigator.geolocation.watchPosition(
-      (pos) => {
+      async (pos) => {
         const { latitude, longitude } = pos.coords;
         setUserCoords({ lat: latitude, lng: longitude });
         setLocationStatus('granted');
+        
+        const address = await reverseGeocode(latitude, longitude);
+        setUserAddress(address);
         
         sendCommand({
           action: 'update_location',
           caretakerId: caretaker.id,
           lat: latitude,
-          lng: longitude
+          lng: longitude,
+          locationName: address
         });
       },
       (err) => {
@@ -260,7 +277,7 @@ const CaregiverDashboard = ({
                     backgroundColor: locationStatus === 'granted' ? 'var(--status-normal)' : (locationStatus === 'denied' ? 'var(--status-critical)' : '#ccc')
                   }}></div>
                   <span style={{color: 'var(--text-muted)', fontWeight: 600}}>
-                    {locationStatus === 'granted' ? `Location Tracking: ${userCoords?.lat.toFixed(4)}, ${userCoords?.lng.toFixed(4)}` : 
+                    {locationStatus === 'granted' ? `Location: ${userAddress}` : 
                      (locationStatus === 'denied' ? 'Location Access Denied' : 'Checking Location Access...')}
                   </span>
                 </div>
