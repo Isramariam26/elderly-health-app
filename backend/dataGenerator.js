@@ -6,8 +6,11 @@ const now = new Date();
 const morningShiftStart = new Date(now); morningShiftStart.setHours(7, 0, 0, 0);
 const morningShiftEnd = new Date(now); morningShiftEnd.setHours(15, 0, 0, 0);
 
-const afternoonShiftStart = new Date(now); afternoonShiftStart.setHours(11, 0, 0, 0);
-const afternoonShiftEnd = new Date(now); afternoonShiftEnd.setHours(19, 0, 0, 0);
+const afternoonShiftStart = new Date(now); afternoonShiftStart.setHours(14, 0, 0, 0); // 2pm
+const afternoonShiftEnd = new Date(now); afternoonShiftEnd.setHours(22, 0, 0, 0); // 10pm
+
+const nightShiftStart = new Date(now); nightShiftStart.setHours(21, 0, 0, 0); // 9pm
+const nightShiftEnd = new Date(now); nightShiftEnd.setDate(now.getDate() + 1); nightShiftEnd.setHours(7, 0, 0, 0); // 7am
 
 const state = {
   patients: [
@@ -65,33 +68,73 @@ const state = {
   ],
   caretakers: [
     {
-      id: 'c1',
-      name: 'Nurse Sarah Mitchell',
+      id: 'CT-001',
+      name: 'Anjali Deshmukh',
       role: 'Registered Nurse',
-      contact: '+1 (555) 123-4567',
+      contact: '9823001122',
       location: { lat: 34.0755, lng: -118.3815 },
-      skills: ['Advanced Cardiac Life Support', 'Wound Care', 'Geriatric Care', 'Critical Care'],
-      experience: '8 years experience in ICU and Geriatrics.',
+      skills: ['B.Sc Nursing', 'Geriatric Care', 'Diabetes & Heart Care'],
+      experience: '10 Years experience.',
       shiftStart: morningShiftStart.toISOString(),
       shiftEnd: morningShiftEnd.toISOString(),
       tasks: [
-        { id: 't1', text: 'Administer IV medication', patientId: 'p2', priority: 'high', interruptible: false, completed: false },
-        { id: 't2', text: 'Morning vitals check', patientId: 'p1', priority: 'normal', interruptible: true, completed: true }
+        { id: generateId(), text: 'Monitor blood sugar, BP, insulin, feet, and fluid intake daily.', patientId: 'p1', priority: 'high', interruptible: false, completed: false }
       ]
     },
     {
-      id: 'c2',
-      name: 'Attendant John Smith',
-      role: 'Basic Care Attendant',
-      contact: '+1 (555) 987-6543',
+      id: 'CT-002',
+      name: 'Ramakrishna Pillai',
+      role: 'GNM Nurse',
+      contact: '9823003344',
       location: { lat: 34.0760, lng: -118.3810 },
-      skills: ['Basic First Aid', 'Mobility Assistance', 'Companionship'],
-      experience: '2 years experience in assisted living.',
+      skills: ['GNM Nursing', 'Physiotherapy', 'Mobility Care'],
+      experience: '15 Years experience.',
+      shiftStart: morningShiftStart.toISOString(),
+      shiftEnd: morningShiftEnd.toISOString(),
+      tasks: [
+        { id: generateId(), text: 'Conduct breathing exercises, physiotherapy, prevent falls.', patientId: 'p2', priority: 'normal', interruptible: true, completed: false }
+      ]
+    },
+    {
+      id: 'CT-003',
+      name: 'Sunita Waghmare',
+      role: 'Psychology Caretaker',
+      contact: '9823005566',
+      location: { lat: 34.0752, lng: -118.3818 },
+      skills: ['B.Sc Psychology', 'Dementia Care', 'Memory & Mental Health'],
+      experience: '6 Years experience.',
       shiftStart: afternoonShiftStart.toISOString(),
       shiftEnd: afternoonShiftEnd.toISOString(),
       tasks: [
-        { id: 't3', text: 'Assist with mobility walk', patientId: 'p3', priority: 'normal', interruptible: true, completed: false },
-        { id: 't4', text: 'Deliver lunch tray', patientId: 'p1', priority: 'high', interruptible: true, completed: false }
+        { id: generateId(), text: 'Run memory routines, prevent wandering, monitor mood.', patientId: 'p3', priority: 'high', interruptible: false, completed: false }
+      ]
+    },
+    {
+      id: 'CT-004',
+      name: 'Prakash Joshi',
+      role: 'ANM Nurse',
+      contact: '9823007788',
+      location: { lat: 34.0758, lng: -118.3802 },
+      skills: ['ANM', 'Kidney & Diabetes Care', 'Chronic Disease Management'],
+      experience: '12 Years experience.',
+      shiftStart: nightShiftStart.toISOString(),
+      shiftEnd: nightShiftEnd.toISOString(),
+      tasks: [
+        { id: generateId(), text: 'Track urine, fluid, BP, diet, and prepare for dialysis.', patientId: 'p1', priority: 'high', interruptible: false, completed: false }
+      ]
+    },
+    {
+      id: 'CT-005',
+      name: 'Kavitha Nair',
+      role: 'Registered Nurse',
+      contact: '9823009900',
+      location: { lat: 34.0762, lng: -118.3814 },
+      skills: ['B.Sc Nursing', 'Thyroid & Hormonal Care', 'General & Preventive Care'],
+      experience: '8 Years experience.',
+      shiftStart: afternoonShiftStart.toISOString(),
+      shiftEnd: afternoonShiftEnd.toISOString(),
+      tasks: [
+        { id: generateId(), text: 'Manage thyroid medication, TSH tests, nutrition charts.', patientId: 'p2', priority: 'normal', interruptible: true, completed: true }
       ]
     }
   ],

@@ -16,6 +16,14 @@ const CaregiverDashboard = ({
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('patients');
   const [selectedPatient, setSelectedPatient] = useState(null);
+  const [selectedCaretaker, setSelectedCaretaker] = useState(null);
+  
+  // Real-time clock for shift tracking
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
   
   // Map Refs
   const mapRef = useRef(null);
@@ -28,10 +36,10 @@ const CaregiverDashboard = ({
   const [newTaskIsInterruptible, setNewTaskIsInterruptible] = useState(true);
   
   // Shift state
-  const [newShiftEndHours, setNewShiftEndHours] = useState('');
+  // Shift expansion was removed by user request
 
-  // We log in as caretaker 'c1' (Nurse Sarah Mitchell)
-  const caretakerId = 'c1';
+  // We log in as caretaker 'CT-001' (Anjali Deshmukh)
+  const caretakerId = 'CT-001';
   const caretaker = globalState.caretakers?.find(c => c.id === caretakerId) || null;
   const allCaretakers = globalState.caretakers || [];
   const allPatients = globalState.patients || [];
@@ -48,7 +56,6 @@ const CaregiverDashboard = ({
   const completedTasks = caretaker.tasks.filter(t => t.completed);
 
   // Time calculations
-  const now = new Date();
   const shiftStart = new Date(caretaker.shiftStart);
   const shiftEnd = new Date(caretaker.shiftEnd);
   const shiftRemainingMins = Math.max(0, Math.floor((shiftEnd - now) / (1000 * 60)));
@@ -72,15 +79,6 @@ const CaregiverDashboard = ({
     }
   };
 
-  const handleAlterShift = (e) => {
-    e.preventDefault();
-    if (newShiftEndHours) {
-      const newD = new Date(shiftEnd);
-      newD.setHours(newD.getHours() + parseInt(newShiftEndHours));
-      sendCommand({ action: 'alter_shift', caretakerId, newEndISO: newD.toISOString() });
-      setNewShiftEndHours('');
-    }
-  };
 
   const clearFallGlobal = () => {
     sendCommand({ action: 'clear_emergency', patientId: activeEmergency.patientId });
@@ -137,13 +135,14 @@ const CaregiverDashboard = ({
       const color = activeEmergency?.patientId === p.id ? 'var(--accent-red)' : '#f43f5e';
       if (!markersRef.current[p.id]) {
         markersRef.current[p.id] = L.marker([p.location.lat, p.location.lng], { 
-          icon: createIcon(color, p.name),
+          icon: createIcon(color, p.name, 'Patient'),
           zIndexOffset: 1000 // Ensure patients are on top
         }).addTo(mapInstance.current)
+          .bindTooltip(`<b>Patient:</b> ${p.name}`, { direction: 'top', offset: [0, -25] })
           .bindPopup(`<b>${p.name}</b><br>${p.location.name}<br>Status: ${activeEmergency?.patientId === p.id ? 'EMERGENCY' : 'Normal'}`);
       } else {
         markersRef.current[p.id].setLatLng([p.location.lat, p.location.lng]);
-        markersRef.current[p.id].setIcon(createIcon(color, p.name));
+        markersRef.current[p.id].setIcon(createIcon(color, p.name, 'Patient'));
       }
     });
 
@@ -155,13 +154,14 @@ const CaregiverDashboard = ({
       const displayName = isMe ? 'You' : c.name.split(' ').pop(); // Just last name for brevity
       if (!markersRef.current[c.id]) {
         markersRef.current[c.id] = L.marker([c.location.lat, c.location.lng], { 
-          icon: createIcon(color, displayName),
+          icon: createIcon(color, displayName, 'Caregiver'),
           zIndexOffset: 500
         }).addTo(mapInstance.current)
+          .bindTooltip(`<b>Caregiver:</b> ${c.name}`, { direction: 'top', offset: [0, -25] })
           .bindPopup(`<b>${c.name}</b><br>${c.role}`);
       } else {
         markersRef.current[c.id].setLatLng([c.location.lat, c.location.lng]);
-        markersRef.current[c.id].setIcon(createIcon(color, displayName));
+        markersRef.current[c.id].setIcon(createIcon(color, displayName, 'Caregiver'));
       }
     });
 
@@ -291,13 +291,9 @@ const CaregiverDashboard = ({
 
                <p><strong>Started:</strong> {shiftStart.toLocaleTimeString()}</p>
                <p style={{marginBottom: '24px'}}><strong>Ending:</strong> {shiftEnd.toLocaleTimeString()}</p>
-
-               <h4 style={{marginBottom: '12px'}}>Alter Shift Timing</h4>
-               <form onSubmit={handleAlterShift} style={{display: 'flex', gap: '8px'}}>
-                 <input type="number" min="1" max="12" placeholder="Hours to extend" value={newShiftEndHours} onChange={(e) => setNewShiftEndHours(e.target.value)} style={{flexGrow: 1, padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)'}}/>
-                 <button type="submit" className="btn-secondary">Extend</button>
-               </form>
             </section>
+
+
 
             <section className="task-list">
                <h3 style={{marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px'}}><User size={20} color="var(--accent-blue)"/> Other Caretakers</h3>
@@ -306,7 +302,7 @@ const CaregiverDashboard = ({
                    const cEnd = new Date(c.shiftEnd);
                    const isOver = cEnd < now;
                    return (
-                     <div key={c.id} className="list-item" style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '16px'}}>
+                     <div key={c.id} className="list-item" onClick={() => setSelectedCaretaker(c)} style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '16px', cursor: 'pointer', backgroundColor: 'var(--bg-card)', transition: 'background-color 0.2s'}}>
                         <div>
                           <h4 style={{margin: '0 0 4px 0'}}>{c.name}</h4>
                           <p style={{margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)'}}>{c.role}</p>
@@ -315,7 +311,12 @@ const CaregiverDashboard = ({
                           {isOver ? (
                             <span className="status-badge" style={{backgroundColor: '#f0f0f0', color: 'var(--text-muted)'}}>Shift Ended</span>
                           ) : (
-                            <span className="status-badge connected">On Shift until {cEnd.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                            <>
+                              <span className="status-badge connected">On Shift until {cEnd.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                              <div style={{fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px'}}>
+                                Time Elapsed: {Math.max(0, Math.floor((now - new Date(c.shiftStart)) / (1000 * 60 * 60)))}h {Math.max(0, Math.floor((now - new Date(c.shiftStart)) / (1000 * 60))) % 60}m {Math.max(0, Math.floor((now - new Date(c.shiftStart)) / 1000)) % 60}s
+                              </div>
+                            </>
                           )}
                         </div>
                      </div>
@@ -441,6 +442,52 @@ const CaregiverDashboard = ({
                        <li key={i} style={{marginBottom: '8px', color: 'var(--text-main)'}}>{h}</li>
                      ))}
                      <li style={{color: 'var(--text-muted)'}}>{selectedPatient.pastMedications?.length || 0} resolved past medications.</li>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Caretaker Details Modal */}
+      {selectedCaretaker && (
+        <div className="modal-overlay" onClick={() => setSelectedCaretaker(null)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+               <div style={{display: 'flex', alignItems: 'center', gap: '16px'}}>
+                 <div className="patient-avatar" style={{fontSize: '3rem', backgroundColor: 'var(--bg-card-blue)'}}>👩‍⚕️</div>
+                 <div>
+                   <h2 style={{fontSize: '1.75rem', marginBottom: '4px', fontWeight: 700}}>
+                     {selectedCaretaker.name} 
+                   </h2>
+                   <p style={{color: 'var(--text-muted)', margin: 0, fontSize: '0.95rem'}}>{selectedCaretaker.role}</p>
+                 </div>
+               </div>
+               <button className="close-btn" onClick={() => setSelectedCaretaker(null)}><X size={20} /></button>
+            </div>
+            
+            <div className="modal-body">
+              <div style={{display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px', color: 'var(--accent-blue)', fontSize: '0.9rem'}}>
+                 <MapPin size={16}/> {selectedCaretaker.location?.name || 'Live Location'} 
+                 <span style={{padding: '2px 8px', borderRadius: '12px', backgroundColor: '#eef2f5', color: '#1d4ed8', fontSize: '0.75rem', fontWeight: 600}}>• Contact: {selectedCaretaker.contact}</span>
+              </div>
+
+              <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px'}}>
+                <div>
+                  <h3 style={{display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px'}}><FileText size={18} color="var(--accent-purple)" /> Skills & Qualifications</h3>
+                  <div className="task-list" style={{boxShadow: 'none', padding: '16px'}}>
+                    {(selectedCaretaker.skills || []).map((skill, i) => (
+                      <li key={i} style={{marginBottom: '8px', color: 'var(--text-main)'}}>{skill}</li>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <h3 style={{display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px'}}><Clock size={18} color="var(--accent-blue)" /> Experience & Shift</h3>
+                  <div style={{backgroundColor: '#f8f9fa', padding: '16px', borderRadius: '8px'}}>
+                     <p style={{marginTop: 0}}><strong>Experience:</strong><br/>{selectedCaretaker.experience}</p>
+                     <p style={{marginBottom: 0}}><strong>Shift Timing:</strong><br/>{new Date(selectedCaretaker.shiftStart).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - {new Date(selectedCaretaker.shiftEnd).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
                   </div>
                 </div>
               </div>
