@@ -30,7 +30,17 @@ function App() {
         try {
           const data = JSON.parse(event.data);
           if (data.type === 'health_update') {
-            setGlobalState(data.payload);
+            const newState = data.payload;
+            setGlobalState(newState);
+
+            // AUTO-SYNC: If we have an active targeted alarm, check if it's still active in globalState
+            setActiveAlarm(prev => {
+              if (!prev) return null;
+              const patient = newState.patients?.find(p => p.id === prev.patientId);
+              // If patient not found or emergency cleared, close the popup
+              if (!patient || !patient.emergencyTriggered) return null;
+              return prev;
+            });
           } else if (data.type === 'connection_status') {
             console.log(data.payload.message);
           } else if (data.type === 'emergency_alarm') {

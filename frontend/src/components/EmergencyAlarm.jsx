@@ -28,22 +28,23 @@ const startAlarm = () => {
   const ctx = getAudioCtx();
   if (!ctx) return;
 
-  if (ctx.state === 'suspended') {
-    ctx.resume().catch(() => console.warn("Audio suspended"));
-  }
-
   const playSiren = () => {
     if (_alarmStopped || !ctx) return;
+
+    // Aggressively attempt to resume if suspended
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
 
     if (ctx.state === 'running') {
       const duration = 0.4;
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
 
-      osc.type = 'square'; // Switch to square for more punch
-      osc.frequency.setValueAtTime(iter % 2 === 0 ? 900 : 600, ctx.currentTime);
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(iter % 2 === 0 ? 1000 : 700, ctx.currentTime);
       
-      gain.gain.setValueAtTime(0.5, ctx.currentTime);
+      gain.gain.setValueAtTime(0.6, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
 
       osc.connect(gain);
@@ -52,8 +53,6 @@ const startAlarm = () => {
       osc.start(ctx.currentTime);
       osc.stop(ctx.currentTime + duration);
       iter++;
-    } else {
-      ctx.resume().catch(() => {});
     }
 
     _alarmTimeoutId = setTimeout(playSiren, 450);
@@ -62,10 +61,10 @@ const startAlarm = () => {
   let iter = 0;
   playSiren();
 
-
-  const unlock = () => { if (ctx.state === 'suspended') ctx.resume(); };
+  const unlock = () => { if (ctx && ctx.state === 'suspended') ctx.resume(); };
   window.addEventListener('click', unlock, { once: true });
   window.addEventListener('touchstart', unlock, { once: true });
+  window.addEventListener('keydown', unlock, { once: true });
 
   if (navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 500]);
 };

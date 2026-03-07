@@ -276,12 +276,13 @@ const CaregiverDashboard = ({
               <div style={{backgroundColor: 'var(--bg-card-purple)', color: 'var(--accent-purple)', padding: '12px', borderRadius: '50%'}}>
                 <User size={24} />
               </div>
-              <div className="nurse-info">
-                <h3>{caretaker.name} <HeartPulse size={16} color="var(--accent-purple)" /></h3>
-                <p>{caretaker.role} • Shift: {shiftStart.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - {shiftEnd.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
-                
-                {/* LOCATION STATUS DISPLAY */}
-                <div style={{marginTop: '4px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem'}}>
+            <div className="nurse-info">
+              <h3>{caretaker.name} <HeartPulse size={16} color="var(--accent-purple)" /></h3>
+              <p>{caretaker.role} • Shift: {shiftStart.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - {shiftEnd.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+              
+              {/* LOCATION STATUS AND SOUND SENTINEL DISPLAY */}
+              <div style={{marginTop: '4px', display: 'flex', alignItems: 'center', gap: '16px', fontSize: '0.8rem'}}>
+                <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
                   <div style={{
                     width: '8px', 
                     height: '8px', 
@@ -293,7 +294,34 @@ const CaregiverDashboard = ({
                      (locationStatus === 'denied' ? 'Location Access Denied' : 'Checking Location Access...')}
                   </span>
                 </div>
+
+                {/* SOUND SENTINEL */}
+                <button 
+                  onClick={() => {
+                    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                    ctx.resume().then(() => {
+                      alert("🔊 Sound Alerts Enabled! You will now hear emergency sirens.");
+                      ctx.close(); // Just used for authorization
+                    });
+                  }}
+                  style={{
+                    backgroundColor: 'var(--bg-card-blue)',
+                    color: 'var(--accent-blue)',
+                    border: '1px solid var(--accent-blue)',
+                    borderRadius: '20px',
+                    padding: '4px 12px',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  🔊 Enable Sound Alerts
+                </button>
               </div>
+            </div>
             </div>
         </div>
       </header>

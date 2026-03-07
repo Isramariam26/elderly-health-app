@@ -222,6 +222,29 @@ const PatientDashboard = ({
         </div>
         
         <div style={{display: 'flex', gap: '16px', alignItems: 'center'}}>
+          {/* SOUND SENTINEL (Authorization) */}
+          <button 
+            onClick={() => {
+              const ctx = new (window.AudioContext || window.webkitAudioContext)();
+              ctx.resume().then(() => {
+                alert("🔊 Sound Enabled! Emergency alarms will now be audible.");
+                ctx.close();
+              });
+            }}
+            style={{
+              backgroundColor: 'rgba(59, 130, 246, 0.1)',
+              color: 'var(--accent-blue)',
+              border: '1px solid var(--accent-blue)',
+              borderRadius: '20px',
+              padding: '6px 16px',
+              fontSize: '0.8rem',
+              fontWeight: 600,
+              cursor: 'pointer'
+            }}
+          >
+            🔊 Enable Sound
+          </button>
+
           {/* INTERACTIVE EMERGENCY BUTTON - ONLY FOR PATIENT ROLE */}
           {role === 'patient' && (
             <button
