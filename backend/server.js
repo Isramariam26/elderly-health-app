@@ -62,7 +62,7 @@ app.post('/v1/patients/live', (req, res) => {
   // 4. Fallback Emergency Trigger (Simple Logic)
   // If HR is critically high or SpO2 critically low, trigger emergency automatically
   if (patient.hr > 120 || patient.spO2 < 88) {
-     if (!patient.emergencyTriggered) {
+     if (!patient.emergencyTriggered && (!patient.emergencyCooldown || Date.now() > patient.emergencyCooldown)) {
         patient.emergencyTriggered = true;
         const severity = patient.hr > 140 || patient.spO2 < 85 ? 'high' : 'medium';
         const assignedCaretaker = routeEmergency(patient.id, severity);
@@ -373,7 +373,10 @@ wss.on('connection', (ws) => {
 
       if (data.action === 'clear_emergency') {
         const p = state.patients.find(p => p.id === data.patientId);
-        if (p) p.emergencyTriggered = false;
+        if (p) {
+          p.emergencyTriggered = false;
+          p.emergencyCooldown = Date.now() + 60000; // 60 seconds silence cooldown
+        }
         state.activeEmergency = null;
       }
 
