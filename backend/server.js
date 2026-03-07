@@ -22,12 +22,99 @@ state.caretakers[1] && (state.caretakers[1].location = { lat: 34.0760, lng: -118
 
 const app = express();
 app.use(cors());
+app.use(express.json()); // Enable JSON body parsing for API requests
 
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 app.get('/api/status', (req, res) => {
   res.json({ status: 'Backend is running correctly.' });
+});
+
+// Real-Time Hardware Ingestion API
+app.post('/v1/patients/live', (req, res) => {
+  const apiKey = req.headers.authorization?.split(' ')[1]; // Extract Bearer token
+  
+  // 1. Verify API Key
+  if (apiKey !== 'CN-LIVE-F4C67F84-D02D44AF799E251D-D275637459CC3695-24DECF') {
+    return res.status(401).json({ error: 'Unauthorized: Invalid API Key' });
+  }
+
+  const { patientId, hr, bp_systolic, bp_diastolic, spO2, temp } = req.body;
+
+  // 2. Find Patient
+  const patient = state.patients.find(p => p.id === patientId);
+  if (!patient) {
+    return res.status(404).json({ error: `Patient with ID ${patientId} not found` });
+  }
+
+  // 3. Update Vitals
+  if (hr !== undefined) patient.hr = hr;
+  if (bp_systolic !== undefined) patient.systolic = bp_systolic;
+  if (bp_diastolic !== undefined) patient.diastolic = bp_diastolic;
+  if (spO2 !== undefined) patient.spO2 = spO2;
+  if (temp !== undefined) patient.temp = temp;
+
+  console.log(`[LIVE API] Received vitals for ${patient.name}: HR ${patient.hr}, BP ${patient.systolic}/${patient.diastolic}`);
+
+  // 4. Fallback Emergency Trigger (Simple Logic)
+  // If HR is critically high or SpO2 critically low, trigger emergency automatically
+  if (patient.hr > 120 || patient.spO2 < 88) {
+     if (!patient.emergencyTriggered) {
+        patient.emergencyTriggered = true;
+        const severity = patient.hr > 140 || patient.spO2 < 85 ? 'high' : 'medium';
+        const assignedCaretaker = routeEmergency(patient.id, severity);
+        
+        state.activeEmergency = {
+          patientId: patient.id,
+          patientName: patient.name,
+          severity: severity,
+          locationName: patient.location.name,
+          status: { hr: patient.hr, bp: `${patient.systolic}/${patient.diastolic}`, spO2: patient.spO2, temp: patient.temp.toFixed(1) },
+          assignedCaretakerId: assignedCaretaker ? assignedCaretaker.id : null,
+          timestamp: new Date().toISOString()
+        };
+
+        const dist = getDistance(patient.location, assignedCaretaker?.location);
+        const distMeters = dist ? Math.round(dist * 111000) : 0;
+        const alarmPayload = {
+          ...state.activeEmergency,
+          assignedCaretakerName: assignedCaretaker?.name,
+          assignmentReason: [
+            `Nearest caregiver (~${distMeters}m away)`,
+            assignedCaretaker?.skills?.[0] ? `Has: ${assignedCaretaker.skills[0]}` : null,
+          ].filter(Boolean).join(' • ')
+        };
+
+        // Broadcast emergency
+        wss.clients.forEach((client) => {
+          if (client.readyState === WebSocket.OPEN) {
+            client.send(JSON.stringify({ type: 'emergency_dispatched', payload: state.activeEmergency }));
+            // Send targeted alarm
+            if (assignedCaretaker && client.caregiverId === assignedCaretaker.id) {
+               client.send(JSON.stringify({ type: 'emergency_alarm', payload: alarmPayload }));
+            }
+          }
+        });
+     }
+  } else {
+     // Auto-resolve if vitals normalize (optional, can be disabled)
+     if (patient.emergencyTriggered && patient.hr <= 100 && patient.spO2 >= 92) {
+       patient.emergencyTriggered = false;
+       if (state.activeEmergency?.patientId === patient.id) {
+         state.activeEmergency = null;
+       }
+     }
+  }
+
+  // 5. Broadcast new state immediately
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(JSON.stringify({ type: 'health_update', payload: state }));
+    }
+  });
+
+  res.status(200).json({ success: true, message: 'Vitals updated and broadcast stream emitted' });
 });
 
 // Simple distance calculation

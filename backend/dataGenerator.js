@@ -15,55 +15,117 @@ const nightShiftEnd = new Date(now); nightShiftEnd.setDate(now.getDate() + 1); n
 const state = {
   patients: [
     {
-      id: 'p1',
-      name: 'Arthur Dent',
-      location: { name: 'Main Lobby', lat: 34.0754, lng: -118.3811 },
-      hr: 75,
-      systolic: 120,
-      diastolic: 80,
-      spO2: 98,
-      sleepScore: 85,
-      temp: 36.8,
-      fallDetected: false,
-      emergencyTriggered: false,
+      id: 'GF-001',
+      name: 'Ramesh Patil',
+      age: 76,
+      condition: 'Type 2 Diabetes',
+      location: { name: 'Room 101', lat: 34.0754, lng: -118.3811 },
+      hr: 72, systolic: 125, diastolic: 82, spO2: 97, sleepScore: 78, temp: 36.7,
+      history: ['Diagnosed 2008', 'Retired farmer'],
       medications: [
-        { id: 'm1', name: 'Lisinopril - 10mg', taken: false, takenAt: null, history: [] },
-        { id: 'm2', name: 'Atorvastatin - 20mg', taken: true, takenAt: new Date(new Date().setHours(8, 0, 0, 0)).toISOString(), history: [new Date(new Date().setHours(8, 0, 0, 0)).toISOString()] }
-      ],
-      pastMedications: ['Metformin - 500mg'],
-      history: ['Hypertension', 'Mild Cognitive Impairment'],
+        { id: 'm1', name: 'Metformin 500mg', taken: false, takenAt: null, history: [] },
+        { id: 'm2', name: 'Glipizide 5mg', taken: true, takenAt: null, history: [] },
+        { id: 'm3', name: 'Aspirin 75mg', taken: true, takenAt: null, history: [] }
+      ]
     },
     {
-       id: 'p2',
-       name: 'Robert Chen',
-       location: { name: 'Room 207 (East Wing)', lat: 34.0758, lng: -118.3805 },
-       hr: 87,
-       systolic: 145,
-       diastolic: 93,
-       spO2: 94,
-       sleepScore: 72,
-       temp: 37.2,
-       fallDetected: false,
-       emergencyTriggered: false,
-       medications: [{ id: 'm3', name: 'Amlodipine - 5mg', taken: false, takenAt: null, history: [] }],
-       pastMedications: [],
-       history: ['Type 2 Diabetes'],
+      id: 'GF-002',
+      name: 'Savitribai Shinde',
+      age: 72,
+      condition: 'Hypertension',
+      location: { name: 'Room 102', lat: 34.0758, lng: -118.3805 },
+      hr: 80, systolic: 155, diastolic: 95, spO2: 96, sleepScore: 65, temp: 36.9,
+      history: ['High BP since 2010', 'Retired school cook'],
+      medications: [
+        { id: 'm4', name: 'Amlodipine 5mg', taken: false, takenAt: null, history: [] },
+        { id: 'm5', name: 'Losartan 50mg', taken: false, takenAt: null, history: [] }
+      ]
     },
     {
-       id: 'p3',
-       name: 'Eleanor Davis',
-       location: { name: 'Room 112 (West Wing)', lat: 34.0750, lng: -118.3820 },
-       hr: 68,
-       systolic: 116,
-       diastolic: 75,
-       spO2: 98,
-       sleepScore: 90,
-       temp: 36.6,
-       fallDetected: false,
-       emergencyTriggered: false,
-       medications: [{ id: 'm4', name: 'Levothyroxine - 50mcg', taken: false, takenAt: null, history: [] }],
-       pastMedications: ['Ibuprofen'],
-       history: ['Arthritis'],
+      id: 'GF-003',
+      name: 'Gopal Rao',
+      age: 80,
+      condition: 'Heart Disease (Weak Heart)',
+      location: { name: 'Room 103', lat: 34.0750, lng: -118.3820 },
+      hr: 88, systolic: 110, diastolic: 70, spO2: 93, sleepScore: 55, temp: 36.5,
+      history: ['Heart attack 2019', 'Pacemaker 2022'],
+      medications: [
+        { id: 'm7', name: 'Furosemide 40mg', taken: true, takenAt: null, history: [] },
+        { id: 'm8', name: 'Carvedilol 6.25mg', taken: false, takenAt: null, history: [] }
+      ]
+    },
+    {
+      id: 'GF-004',
+      name: 'Kausalya Menon',
+      age: 68,
+      condition: 'Underactive Thyroid',
+      location: { name: 'Room 104', lat: 34.0762, lng: -118.3812 },
+      hr: 65, systolic: 118, diastolic: 78, spO2: 98, sleepScore: 82, temp: 36.2,
+      history: ['Hypothyroidism 2014', 'Retired tailor'],
+      medications: [{ id: 'm11', name: 'Levothyroxine 75mcg', taken: true, takenAt: null, history: [] }]
+    },
+    {
+      id: 'GF-005',
+      name: 'Vitthal Kulkarni',
+      age: 84,
+      condition: 'Asthma & Breathing Difficulty',
+      location: { name: 'Room 105', lat: 34.0755, lng: -118.3825 },
+      hr: 92, systolic: 135, diastolic: 85, spO2: 90, sleepScore: 60, temp: 37.1,
+      history: ['Asthma since childhood', 'Retired weaver'],
+      medications: [{ id: 'm14', name: 'Budesonide Inhaler', taken: true, takenAt: null, history: [] }]
+    },
+    {
+      id: 'GF-006',
+      name: 'Saroja Naidu',
+      age: 73,
+      condition: 'Arthritis (Knee Pain)',
+      location: { name: 'Room 106', lat: 34.0748, lng: -118.3815 },
+      hr: 74, systolic: 128, diastolic: 84, spO2: 98, sleepScore: 70, temp: 36.6,
+      history: ['Osteoarthritis 2016', 'Homemaker'],
+      medications: [{ id: 'm17', name: 'Paracetamol 500mg', taken: false, takenAt: null, history: [] }]
+    },
+    {
+      id: 'GF-007',
+      name: 'Balakrishna Iyer',
+      age: 79,
+      condition: 'Diabetes + Hypertension',
+      location: { name: 'Room 107', lat: 34.0765, lng: -118.3820 },
+      hr: 85, systolic: 170, diastolic: 100, spO2: 92, sleepScore: 50, temp: 36.8,
+      history: ['Diabetes 2001', 'Retired teacher'],
+      medications: [
+        { id: 'm21', name: 'Metformin 1000mg', taken: false, takenAt: null, history: [] },
+        { id: 'm22', name: 'Insulin (10 units)', taken: false, takenAt: null, history: [] }
+      ]
+    },
+    {
+      id: 'GF-008',
+      name: 'Meenakshi Desai',
+      age: 71,
+      condition: 'Early Dementia',
+      location: { name: 'Room 108', lat: 34.0752, lng: -118.3830 },
+      hr: 70, systolic: 120, diastolic: 80, spO2: 99, sleepScore: 75, temp: 36.7,
+      history: ['Alzheimers 2022', 'Retired bank teller'],
+      medications: [{ id: 'm25', name: 'Donepezil 5mg', taken: true, takenAt: null, history: [] }]
+    },
+    {
+      id: 'GF-009',
+      name: 'Shriram Joshi',
+      age: 82,
+      condition: 'Chronic Kidney Disease',
+      location: { name: 'Room 109', lat: 34.0768, lng: -118.3808 },
+      hr: 78, systolic: 140, diastolic: 90, spO2: 94, sleepScore: 68, temp: 36.9,
+      history: ['Kidney weakness 2018', 'Retired postman'],
+      medications: [{ id: 'm28', name: 'Furosemide 40mg', taken: true, takenAt: null, history: [] }]
+    },
+    {
+      id: 'GF-010',
+      name: 'Laxmibai Pawar',
+      age: 67,
+      condition: 'Clinical Depression',
+      location: { name: 'Room 110', lat: 34.0745, lng: -118.3810 },
+      hr: 72, systolic: 122, diastolic: 82, spO2: 98, sleepScore: 85, temp: 36.6,
+      history: ['Lost family 2021', 'Retired nurse'],
+      medications: [{ id: 'm31', name: 'Sertraline 50mg', taken: true, takenAt: null, history: [] }]
     }
   ],
   caretakers: [
@@ -78,7 +140,7 @@ const state = {
       shiftStart: morningShiftStart.toISOString(),
       shiftEnd: morningShiftEnd.toISOString(),
       tasks: [
-        { id: generateId(), text: 'Monitor blood sugar, BP, insulin, feet, and fluid intake daily.', patientId: 'p1', priority: 'high', interruptible: false, completed: false }
+        { id: generateId(), text: 'Monitor blood sugar, BP, insulin, feet, and fluid intake daily.', patientId: 'GF-001', priority: 'high', interruptible: false, completed: false }
       ]
     },
     {
@@ -92,7 +154,7 @@ const state = {
       shiftStart: morningShiftStart.toISOString(),
       shiftEnd: morningShiftEnd.toISOString(),
       tasks: [
-        { id: generateId(), text: 'Conduct breathing exercises, physiotherapy, prevent falls.', patientId: 'p2', priority: 'normal', interruptible: true, completed: false }
+        { id: generateId(), text: 'Conduct breathing exercises, physiotherapy, prevent falls.', patientId: 'GF-002', priority: 'normal', interruptible: true, completed: false }
       ]
     },
     {
@@ -106,7 +168,7 @@ const state = {
       shiftStart: afternoonShiftStart.toISOString(),
       shiftEnd: afternoonShiftEnd.toISOString(),
       tasks: [
-        { id: generateId(), text: 'Run memory routines, prevent wandering, monitor mood.', patientId: 'p3', priority: 'high', interruptible: false, completed: false }
+        { id: generateId(), text: 'Run memory routines, prevent wandering, monitor mood.', patientId: 'GF-003', priority: 'high', interruptible: false, completed: false }
       ]
     },
     {
@@ -120,7 +182,7 @@ const state = {
       shiftStart: nightShiftStart.toISOString(),
       shiftEnd: nightShiftEnd.toISOString(),
       tasks: [
-        { id: generateId(), text: 'Track urine, fluid, BP, diet, and prepare for dialysis.', patientId: 'p1', priority: 'high', interruptible: false, completed: false }
+        { id: generateId(), text: 'Track urine, fluid, BP, diet, and prepare for dialysis.', patientId: 'GF-001', priority: 'high', interruptible: false, completed: false }
       ]
     },
     {
@@ -134,7 +196,7 @@ const state = {
       shiftStart: afternoonShiftStart.toISOString(),
       shiftEnd: afternoonShiftEnd.toISOString(),
       tasks: [
-        { id: generateId(), text: 'Manage thyroid medication, TSH tests, nutrition charts.', patientId: 'p2', priority: 'normal', interruptible: true, completed: true }
+        { id: generateId(), text: 'Manage thyroid medication, TSH tests, nutrition charts.', patientId: 'GF-002', priority: 'normal', interruptible: true, completed: true }
       ]
     }
   ],
@@ -151,12 +213,23 @@ const tick = () => {
 
   // Fluctuate patient vitals
   state.patients.forEach(p => {
-    p.hr = Math.max(50, Math.min(150, p.hr + randomInt(-2, 2)));
-    p.systolic = Math.max(90, Math.min(180, p.systolic + randomInt(-2, 2)));
-    p.diastolic = Math.max(60, Math.min(110, p.diastolic + randomInt(-1, 1)));
-    p.spO2 = Math.max(85, Math.min(100, p.spO2 + randomInt(-1, 1)));
+    // Condition-specific volatility
+    let volatility = 2;
+    if (p.id === 'GF-003' || p.id === 'GF-007' || p.id === 'GF-009') volatility = 4; // Critical patients
+
+    p.hr = Math.max(50, Math.min(150, p.hr + randomInt(-volatility, volatility)));
+    p.systolic = Math.max(90, Math.min(190, p.systolic + randomInt(-volatility, volatility)));
+    p.diastolic = Math.max(60, Math.min(110, p.diastolic + randomInt(-Math.floor(volatility/2), Math.floor(volatility/2))));
+    
+    // SpO2 logic for Asthma
+    if (p.id === 'GF-005') {
+       p.spO2 = Math.max(82, Math.min(95, p.spO2 + randomInt(-2, 1)));
+    } else {
+       p.spO2 = Math.max(88, Math.min(100, p.spO2 + randomInt(-1, 1)));
+    }
+
     p.sleepScore = Math.max(0, Math.min(100, p.sleepScore + randomInt(-1, 1)));
-    p.temp = Math.max(36.1, Math.min(37.5, p.temp + (Math.random() - 0.5) * 0.2));
+    p.temp = Math.max(36.1, Math.min(37.8, p.temp + (Math.random() - 0.5) * 0.2));
   });
 };
 
