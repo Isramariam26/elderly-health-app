@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom';
 import MetricCard from '../components/MetricCard';
 
 // ─── MODULE-LEVEL SINGLETON FOR PATIENT ALARM ────────────────────────────────
-// Keeping the context alive preserves the browser's user-gesture authorization.
 let _patientAlarmCtx = null;
 let _patientAlarmStopped = true;
 let _patientAlarmTimeoutId = null;
@@ -12,12 +11,19 @@ let _patientAlarmTimeoutId = null;
 const getPatientAudioCtx = () => {
   if (!_patientAlarmCtx) {
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    if (AudioCtx) {
-      _patientAlarmCtx = new AudioCtx();
-    }
+    if (AudioCtx) _patientAlarmCtx = new AudioCtx();
   }
   return _patientAlarmCtx;
 };
+
+const stopPatientAlarm = () => {
+  _patientAlarmStopped = true;
+  if (_patientAlarmTimeoutId !== null) {
+    clearTimeout(_patientAlarmTimeoutId);
+    _patientAlarmTimeoutId = null;
+  }
+};
+
 
 
 const PatientDashboard = ({ 
@@ -96,6 +102,8 @@ const PatientDashboard = ({
     };
   }, [patient?.id, role]);
 
+  const [audioState, setAudioState] = useState('unknown');
+
   // Auto-start / auto-stop alarm based on emergencyTriggered from server state
   React.useEffect(() => {
     if (role !== 'patient' || !patient) return;
@@ -132,32 +140,22 @@ const PatientDashboard = ({
         if (navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 500]);
         scheduleBeep();
 
-        const unlockPatient = () => {
-          if (ctx.state === 'suspended') ctx.resume();
-        };
+        const unlockPatient = () => { if (ctx.state === 'suspended') ctx.resume(); };
         window.addEventListener('click', unlockPatient, { once: true });
         window.addEventListener('keydown', unlockPatient, { once: true });
-
-        alarmStopRef.current = () => {
-          _patientAlarmStopped = true;
-          if (_patientAlarmTimeoutId !== null) {
-            clearTimeout(_patientAlarmTimeoutId);
-            _patientAlarmTimeoutId = null;
-          }
-        };
       }
     } else {
-      if (alarmStopRef.current) {
-        alarmStopRef.current();
-        alarmStopRef.current = null;
-      }
+      stopPatientAlarm();
     }
 
+    const checkAudio = setInterval(() => {
+      const ctx = getPatientAudioCtx();
+      setAudioState(ctx ? ctx.state : 'unsupported');
+    }, 500);
+
     return () => {
-      if (alarmStopRef.current) {
-        alarmStopRef.current();
-        alarmStopRef.current = null;
-      }
+      stopPatientAlarm();
+      clearInterval(checkAudio);
     };
   }, [patient?.emergencyTriggered, role]);
 
@@ -170,8 +168,8 @@ const PatientDashboard = ({
   };
 
   const clearEmergency = () => {
+    stopPatientAlarm(); // STOP LOCALLY IMMEDIATELY
     sendCommand({ action: 'clear_emergency', patientId: patient.id });
-    // Alarm auto-stops via useEffect watching patient.emergencyTriggered
   };
 
   const addMedication = (e) => {
@@ -229,29 +227,42 @@ const PatientDashboard = ({
         <div style={{
           backgroundColor: '#dc2626',
           color: 'white',
-          padding: '16px 24px',
+          padding: '24px',
           fontWeight: 'bold',
-          fontSize: '1.1rem',
           marginBottom: '24px',
+          borderRadius: '16px',
           display: 'flex',
+          flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: 'space-between',
+          gap: '16px',
           animation: 'alarmPulse 1.5s ease-in-out infinite'
         }}>
-          <span>🚨 EMERGENCY ALERT SENT — Nearest caretaker has been notified. Help is on the way.</span>
+          <div style={{fontSize: '1.4rem', textAlign: 'center'}}>🚨 EMERGENCY ALERT SENT</div>
+          
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '8px',
+            padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem',
+            background: audioState === 'running' ? 'rgba(34,197,94,0.3)' : 'rgba(234,179,8,0.3)',
+            border: `1px solid ${audioState === 'running' ? '#4ade80' : '#fde047'}`,
+            color: 'white'
+          }}>
+            {audioState === 'running' ? '🔊 Alarm is ringing' : '🔇 Browser muted sound — Click anywhere to activate'}
+          </div>
+
+          <p style={{margin: 0, fontWeight: 400, fontSize: '0.95rem', textAlign: 'center'}}>Nearest caretaker has been notified. Help is on the way.</p>
+
           <button
             onClick={clearEmergency}
             style={{
               backgroundColor: 'white',
               color: '#dc2626',
               border: 'none',
-              borderRadius: '8px',
-              padding: '8px 20px',
-              fontWeight: 700,
+              borderRadius: '12px',
+              padding: '12px 32px',
+              fontWeight: 800,
               cursor: 'pointer',
-              fontSize: '0.9rem',
-              flexShrink: 0,
-              marginLeft: '16px'
+              fontSize: '1rem',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
             }}
           >
             🛑 Stop Alarm
