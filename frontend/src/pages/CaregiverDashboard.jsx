@@ -282,51 +282,20 @@ const CaregiverDashboard = ({
               <h3>{caretaker.name} <HeartPulse size={16} color="var(--accent-purple)" /></h3>
               <p>{caretaker.role} • Shift: {shiftStart.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - {shiftEnd.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
               
-              {/* LOCATION STATUS AND SOUND SENTINEL DISPLAY */}
-              <div style={{marginTop: '4px', display: 'flex', alignItems: 'center', gap: '16px', fontSize: '0.8rem'}}>
-                <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
-                  <div style={{
-                    width: '8px', 
-                    height: '8px', 
-                    borderRadius: '50%', 
-                    backgroundColor: locationStatus === 'granted' ? 'var(--status-normal)' : (locationStatus === 'denied' ? 'var(--status-critical)' : '#ccc')
-                  }}></div>
-                  <span style={{color: 'var(--text-muted)', fontWeight: 600}}>
-                    {locationStatus === 'granted' ? `Location: ${userAddress}` : 
-                     (locationStatus === 'denied' ? 'Location Access Denied' : 'Checking Location Access...')}
-                  </span>
-                </div>
-
-                {/* SOUND SENTINEL */}
-                <button 
-                  onClick={async () => {
-                    const success = await authorizeAudio();
-                    if (success) {
-                      alert("🔊 Sound Alerts Enabled! You will now hear emergency sirens.");
-                    } else {
-                      alert("⚠️ Sound could not be enabled. Please ensure your browser allows audio.");
-                    }
-                  }}
-
-                  style={{
-                    backgroundColor: 'var(--bg-card-blue)',
-                    color: 'var(--accent-blue)',
-                    border: '1px solid var(--accent-blue)',
-                    borderRadius: '20px',
-                    padding: '4px 12px',
-                    fontSize: '0.75rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}
-                >
-                  🔊 Enable Sound Alerts
-                </button>
+              <div style={{marginTop: '4px', display: 'flex', alignItems: 'center', gap: '8px'}}>
+                <div style={{
+                  width: '8px', 
+                  height: '8px', 
+                  borderRadius: '50%', 
+                  backgroundColor: locationStatus === 'granted' ? 'var(--status-normal)' : (locationStatus === 'denied' ? 'var(--status-critical)' : '#ccc')
+                }}></div>
+                <span style={{color: 'var(--text-muted)', fontWeight: 600}}>
+                  {locationStatus === 'granted' ? `Location: ${userAddress}` : 
+                   (locationStatus === 'denied' ? 'Location Access Denied' : 'Checking Location Access...')}
+                </span>
               </div>
             </div>
-            </div>
+          </div>
         </div>
       </header>
 
