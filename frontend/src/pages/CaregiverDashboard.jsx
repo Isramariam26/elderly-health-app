@@ -20,6 +20,10 @@ const CaregiverDashboard = ({
   
   // Real-time clock for shift tracking
   const [now, setNow] = useState(new Date());
+  // Location and Permission state
+  const [userCoords, setUserCoords] = useState(null);
+  const [locationStatus, setLocationStatus] = useState('checking'); // 'checking', 'granted', 'denied', 'unsupported'
+
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
@@ -52,18 +56,29 @@ const CaregiverDashboard = ({
 
   // STAFF GEOLOCATION REPORTING
   useEffect(() => {
-    if (!caretaker || !navigator.geolocation) return;
+    if (!caretaker) return;
+    if (!navigator.geolocation) {
+      setLocationStatus('unsupported');
+      return;
+    }
 
     const watchId = navigator.geolocation.watchPosition(
       (pos) => {
+        const { latitude, longitude } = pos.coords;
+        setUserCoords({ lat: latitude, lng: longitude });
+        setLocationStatus('granted');
+        
         sendCommand({
           action: 'update_location',
           caretakerId: caretaker.id,
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude
+          lat: latitude,
+          lng: longitude
         });
       },
-      (err) => console.warn("Staff Geolocation error:", err),
+      (err) => {
+        console.warn("Staff Geolocation error:", err);
+        setLocationStatus(err.code === 1 ? 'denied' : 'error');
+      },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
 
@@ -235,6 +250,20 @@ const CaregiverDashboard = ({
               <div className="nurse-info">
                 <h3>{caretaker.name} <HeartPulse size={16} color="var(--accent-purple)" /></h3>
                 <p>{caretaker.role} • Shift: {shiftStart.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - {shiftEnd.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                
+                {/* LOCATION STATUS DISPLAY */}
+                <div style={{marginTop: '4px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem'}}>
+                  <div style={{
+                    width: '8px', 
+                    height: '8px', 
+                    borderRadius: '50%', 
+                    backgroundColor: locationStatus === 'granted' ? 'var(--status-normal)' : (locationStatus === 'denied' ? 'var(--status-critical)' : '#ccc')
+                  }}></div>
+                  <span style={{color: 'var(--text-muted)', fontWeight: 600}}>
+                    {locationStatus === 'granted' ? `Location Tracking: ${userCoords?.lat.toFixed(4)}, ${userCoords?.lng.toFixed(4)}` : 
+                     (locationStatus === 'denied' ? 'Location Access Denied' : 'Checking Location Access...')}
+                  </span>
+                </div>
               </div>
             </div>
         </div>

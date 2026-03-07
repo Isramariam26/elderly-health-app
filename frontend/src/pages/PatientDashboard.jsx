@@ -14,6 +14,10 @@ const PatientDashboard = ({
   const navigate = useNavigate();
   const [newMedName, setNewMedName] = useState('');
   const [showCareTeam, setShowCareTeam] = useState(false);
+  
+  // Location and Permission state
+  const [userCoords, setUserCoords] = useState(null);
+  const [locationStatus, setLocationStatus] = useState('checking'); // 'checking', 'granted', 'denied', 'unsupported'
 
   // For demo purposes, we log in as patient 'p1' (Arthur Dent)
   const patient = globalState.patients?.find(p => p.id === 'p1');
@@ -26,16 +30,25 @@ const PatientDashboard = ({
     if ("geolocation" in navigator) {
       watchId = navigator.geolocation.watchPosition(
         (position) => {
+          const { latitude, longitude } = position.coords;
+          setUserCoords({ lat: latitude, lng: longitude });
+          setLocationStatus('granted');
+
           sendCommand({
             action: 'update_location',
             patientId: patient.id,
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
+            lat: latitude,
+            lng: longitude
           });
         },
-        (error) => console.warn("Location error:", error.message),
+        (error) => {
+          console.warn("Location error:", error.message);
+          setLocationStatus(error.code === 1 ? 'denied' : 'error');
+        },
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       );
+    } else {
+      setLocationStatus('unsupported');
     }
     return () => {
       if (watchId) navigator.geolocation.clearWatch(watchId);
@@ -102,7 +115,19 @@ const PatientDashboard = ({
           
           <div style={{display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'var(--bg-card)', padding: '10px 24px', borderRadius: '9999px', fontSize: '1.1rem', fontWeight: 600, border: '1px solid var(--border-color)', boxShadow: '0 4px 12px rgba(0,0,0,0.05)'}}>
             <MapPin size={22} color="var(--accent-blue)" />
-            <span style={{color: 'var(--text-main)'}}>{patient.location.name}</span>
+            <div style={{display: 'flex', flexDirection: 'column'}}>
+              <span style={{color: 'var(--text-main)'}}>{patient.location.name}</span>
+              {locationStatus === 'granted' && userCoords && (
+                <span style={{fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400}}>
+                  Live GPS: {userCoords.lat.toFixed(4)}, {userCoords.lng.toFixed(4)}
+                </span>
+              )}
+              {locationStatus === 'denied' && (
+                <span style={{fontSize: '0.75rem', color: 'var(--status-critical)', fontWeight: 400}}>
+                  Location Denied
+                </span>
+              )}
+            </div>
             <div style={{marginLeft: '12px', paddingLeft: '12px', borderLeft: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.9rem', color: connectionStatus === 'connected' ? 'var(--status-normal)' : 'var(--status-critical)'}}>
               <span style={{display: 'inline-block', width: '10px', height: '10px', backgroundColor: connectionStatus === 'connected' ? 'var(--status-normal)' : 'var(--status-critical)', borderRadius: '50%'}}></span>
               {connectionStatus === 'connected' ? 'Live' : 'Offline'}
