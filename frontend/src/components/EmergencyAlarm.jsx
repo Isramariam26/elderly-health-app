@@ -1,19 +1,11 @@
 import React, { useEffect, useState } from 'react';
 
-// ─── MODULE-LEVEL SINGLETON ALARM ─────────────────────────────────────────────
-let _alarmCtx = null;
+import { getAudioCtx } from '../utils/audioService';
+
+// ─── MODULE-LEVEL CONTROL ─────────────────────────────────────────────────────
 let _alarmStopped = true;
 let _alarmTimeoutId = null;
 
-const getAudioCtx = () => {
-  if (!_alarmCtx) {
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    if (AudioCtx) {
-      _alarmCtx = new AudioCtx();
-    }
-  }
-  return _alarmCtx;
-};
 
 const stopAlarm = () => {
   _alarmStopped = true;
@@ -100,17 +92,22 @@ const EmergencyAlarm = ({ alarm, onDismiss, sendCommand }) => {
     onDismiss();
   };
 
-  const unlockAudioManually = () => {
+  const unlockAudioManually = async () => {
     const ctx = getAudioCtx();
     if (ctx) {
       if (ctx.state === 'suspended') {
-        ctx.resume().then(() => setAudioState('running')).catch(e => console.error("Manual resume failed:", e));
+        try {
+          await ctx.resume();
+          setAudioState('running');
+        } catch (e) {
+          console.error("Manual resume failed:", e);
+        }
       } else {
-        // If already running but silent, maybe re-trigger the startAlarm
         startAlarm();
       }
     }
   };
+
 
 
   if (!alarm) return null;

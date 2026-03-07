@@ -2,21 +2,16 @@ import React, { useState, useRef } from 'react';
 import { HeartPulse, Activity, AlertTriangle, User, PhoneCall, Plus, CheckCircle2, Circle, Clock, Info, ChevronDown, ChevronRight, MapPin } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import MetricCard from '../components/MetricCard';
+import { getAudioCtx, authorizeAudio } from '../utils/audioService';
 
 // ─── MODULE-LEVEL SINGLETON FOR PATIENT ALARM ────────────────────────────────
-let _patientAlarmCtx = null;
+
 let _patientAlarmStopped = true;
 let _patientAlarmTimeoutId = null;
 let _patientManualSilence = false; // Prevents auto-restart if user clicked stop
 
-const getPatientAudioCtx = () => {
+const getPatientAudioCtx = () => getAudioCtx(); // Use shared context
 
-  if (!_patientAlarmCtx) {
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    if (AudioCtx) _patientAlarmCtx = new AudioCtx();
-  }
-  return _patientAlarmCtx;
-};
 
 const stopPatientAlarm = () => {
   _patientAlarmStopped = true;
@@ -224,13 +219,15 @@ const PatientDashboard = ({
         <div style={{display: 'flex', gap: '16px', alignItems: 'center'}}>
           {/* SOUND SENTINEL (Authorization) */}
           <button 
-            onClick={() => {
-              const ctx = new (window.AudioContext || window.webkitAudioContext)();
-              ctx.resume().then(() => {
+            onClick={async () => {
+              const success = await authorizeAudio();
+              if (success) {
                 alert("🔊 Sound Enabled! Emergency alarms will now be audible.");
-                ctx.close();
-              });
+              } else {
+                alert("⚠️ Sound could not be enabled. Please check browser permissions.");
+              }
             }}
+
             style={{
               backgroundColor: 'rgba(59, 130, 246, 0.1)',
               color: 'var(--accent-blue)',

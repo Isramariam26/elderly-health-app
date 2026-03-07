@@ -3,6 +3,8 @@ import { Activity, User, MapPin, HeartPulse, FileText, CheckCircle2, Circle, X, 
 import { useNavigate } from 'react-router-dom';
 import MetricCard from '../components/MetricCard';
 import EmergencyAlarm from '../components/EmergencyAlarm';
+import { authorizeAudio } from '../utils/audioService';
+
 
 // Normalize coordinates to percentage for SVG Map
 const normalizeCoord = (val, min, max) => ((val - min) / (max - min)) * 100;
@@ -297,13 +299,15 @@ const CaregiverDashboard = ({
 
                 {/* SOUND SENTINEL */}
                 <button 
-                  onClick={() => {
-                    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                    ctx.resume().then(() => {
+                  onClick={async () => {
+                    const success = await authorizeAudio();
+                    if (success) {
                       alert("🔊 Sound Alerts Enabled! You will now hear emergency sirens.");
-                      ctx.close(); // Just used for authorization
-                    });
+                    } else {
+                      alert("⚠️ Sound could not be enabled. Please ensure your browser allows audio.");
+                    }
                   }}
+
                   style={{
                     backgroundColor: 'var(--bg-card-blue)',
                     color: 'var(--accent-blue)',
