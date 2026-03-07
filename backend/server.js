@@ -40,7 +40,7 @@ app.post('/v1/patients/live', (req, res) => {
     return res.status(401).json({ error: 'Unauthorized: Invalid API Key' });
   }
 
-  const { patientId, hr, bp_systolic, bp_diastolic, spO2, temp } = req.body;
+  const { patientId, hr, bp_systolic, bp_diastolic, spO2, temp, lat, lng } = req.body;
 
   // 2. Find Patient
   const patient = state.patients.find(p => p.id === patientId);
@@ -48,14 +48,16 @@ app.post('/v1/patients/live', (req, res) => {
     return res.status(404).json({ error: `Patient with ID ${patientId} not found` });
   }
 
-  // 3. Update Vitals
+  // 3. Update Vitals & Location
   if (hr !== undefined) patient.hr = hr;
   if (bp_systolic !== undefined) patient.systolic = bp_systolic;
   if (bp_diastolic !== undefined) patient.diastolic = bp_diastolic;
   if (spO2 !== undefined) patient.spO2 = spO2;
   if (temp !== undefined) patient.temp = temp;
+  if (lat !== undefined) patient.location.lat = lat;
+  if (lng !== undefined) patient.location.lng = lng;
 
-  console.log(`[LIVE API] Received vitals for ${patient.name}: HR ${patient.hr}, BP ${patient.systolic}/${patient.diastolic}`);
+  console.log(`[LIVE API] Received data for ${patient.name}: HR ${patient.hr}, Pos [${lat}, ${lng}]`);
 
   // 4. Fallback Emergency Trigger (Simple Logic)
   // If HR is critically high or SpO2 critically low, trigger emergency automatically
@@ -115,6 +117,36 @@ app.post('/v1/patients/live', (req, res) => {
   });
 
   res.status(200).json({ success: true, message: 'Vitals updated and broadcast stream emitted' });
+});
+
+// Real-Time Caretaker Tracking API
+app.post('/v1/caretakers/live', (req, res) => {
+  const apiKey = req.headers.authorization?.split(' ')[1];
+  
+  if (apiKey !== 'CN-LIVE-F4C67F84-D02D44AF799E251D-D275637459CC3695-24DECF') {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { caretakerId, lat, lng } = req.body;
+
+  const caretaker = state.caretakers.find(c => c.id === caretakerId);
+  if (!caretaker) {
+    return res.status(404).json({ error: `Caretaker ${caretakerId} not found` });
+  }
+
+  if (lat !== undefined) caretaker.location.lat = lat;
+  if (lng !== undefined) caretaker.location.lng = lng;
+
+  console.log(`[LIVE API] Received location for Caretaker ${caretaker.name}: [${lat}, ${lng}]`);
+
+  // Broadcast
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(JSON.stringify({ type: 'health_update', payload: state }));
+    }
+  });
+
+  res.status(200).json({ success: true, message: 'Location updated' });
 });
 
 // Simple distance calculation
