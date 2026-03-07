@@ -49,10 +49,24 @@ const startAlarm = () => {
   };
 
   if (_alarmCtx.state === 'suspended') {
-    _alarmCtx.resume().then(beep);
-  } else {
-    beep();
+    _alarmCtx.resume().catch(() => {
+      console.warn("Autoplay blocked. Sound will play upon next user interaction.");
+    });
   }
+  
+  // ALWAYS start the loop. Even if suspended, the JS loop will keep scheduling oscillators.
+  // When the context is resumed by a user click, it will instantly start producing sound.
+  beep();
+
+  // Attach a global listener to resume audio upon ANY interaction if it was blocked
+  const unlockAudio = () => {
+    if (_alarmCtx && _alarmCtx.state === 'suspended') {
+      _alarmCtx.resume();
+    }
+  };
+  document.addEventListener('click', unlockAudio, { once: true });
+  document.addEventListener('keydown', unlockAudio, { once: true });
+  document.addEventListener('touchstart', unlockAudio, { once: true });
 
   if (navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 500]);
 };

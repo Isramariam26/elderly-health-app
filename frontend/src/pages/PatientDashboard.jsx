@@ -109,7 +109,22 @@ const PatientDashboard = ({
           timeoutId = setTimeout(scheduleBeep, 340);
         };
         if (navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 500]);
-        if (ctx.state === 'suspended') ctx.resume().then(scheduleBeep); else scheduleBeep();
+        
+        // Handle Autoplay Policy restrictions gracefully
+        if (ctx.state === 'suspended') {
+          ctx.resume().catch(() => console.warn("Autoplay blocked. Sound will play on next interaction."));
+        }
+        
+        // Always schedule beeps (runs in JS even if AudioCtx is muted by browser)
+        scheduleBeep();
+
+        // Attach global listeners to unlock the audio the second the user interacts with the page
+        const unlockPatientAudio = () => {
+          if (ctx && ctx.state === 'suspended') ctx.resume();
+        };
+        document.addEventListener('click', unlockPatientAudio, { once: true });
+        document.addEventListener('keydown', unlockPatientAudio, { once: true });
+        document.addEventListener('touchstart', unlockPatientAudio, { once: true });
         alarmStopRef.current = () => {
           stopped = true;
           if (timeoutId !== null) { clearTimeout(timeoutId); timeoutId = null; }
