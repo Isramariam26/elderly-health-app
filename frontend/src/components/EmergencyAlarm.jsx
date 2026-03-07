@@ -81,7 +81,7 @@ const startAlarm = () => {
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
-const EmergencyAlarm = ({ alarm, onDismiss }) => {
+const EmergencyAlarm = ({ alarm, onDismiss, sendCommand }) => {
   const stopAlarmRef = useRef(null);
   const [elapsed, setElapsed] = useState(0);
   const [audioBlocked, setAudioBlocked] = useState(false);
@@ -110,6 +110,10 @@ const EmergencyAlarm = ({ alarm, onDismiss }) => {
 
   const handleDismiss = () => {
     if (stopAlarmRef.current) stopAlarmRef.current();
+    // Also clear the emergency on the server so patient banner and all caretaker banners clear
+    if (sendCommand && alarm?.patientId) {
+      sendCommand({ action: 'clear_emergency', patientId: alarm.patientId });
+    }
     onDismiss();
   };
 
@@ -229,28 +233,19 @@ const EmergencyAlarm = ({ alarm, onDismiss }) => {
           Alert triggered {formatElapsed(elapsed)}
         </div>
 
-        {/* Buttons */}
+        {/* Action Buttons */}
         <div style={{ display: 'flex', gap: '12px' }}>
           <button
             onClick={handleDismiss}
             style={{
-              flex: 1, padding: '16px', background: '#ef4444',
-              color: 'white', border: 'none', borderRadius: '12px',
-              fontSize: '1rem', fontWeight: 700, cursor: 'pointer'
+              flex: 1, padding: '18px', background: '#ef4444',
+              color: 'white', border: '2px solid rgba(255,255,255,0.3)',
+              borderRadius: '12px', fontSize: '1.05rem', fontWeight: 800,
+              cursor: 'pointer', letterSpacing: '0.5px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.4)'
             }}
           >
-            ✅ I'm On It — Responding
-          </button>
-          <button
-            onClick={handleDismiss}
-            style={{
-              flex: 0.4, padding: '16px',
-              background: 'rgba(255,255,255,0.1)', color: 'white',
-              border: '1px solid rgba(255,255,255,0.2)', borderRadius: '12px',
-              fontSize: '1rem', fontWeight: 600, cursor: 'pointer'
-            }}
-          >
-            Dismiss
+            ✅ Acknowledged and Cleared
           </button>
         </div>
       </div>

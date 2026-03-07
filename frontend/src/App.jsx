@@ -92,6 +92,7 @@ function App() {
           <EmergencyAlarm
             alarm={activeAlarm}
             onDismiss={() => setActiveAlarm(null)}
+            sendCommand={sendCommand}
           />
         )}
         <Routes>
