@@ -135,6 +135,7 @@ function App() {
               sendCommand={sendCommand}
               activeAlarm={activeAlarm}
               setActiveAlarm={setActiveAlarm}
+              loggedInId={loggedInId}
             />
           } />
 

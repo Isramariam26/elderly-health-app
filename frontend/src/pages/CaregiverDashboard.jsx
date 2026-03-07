@@ -16,7 +16,8 @@ const CaregiverDashboard = ({
   connectionStatus, 
   sendCommand,
   activeAlarm,
-  setActiveAlarm
+  setActiveAlarm,
+  loggedInId
 }) => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('patients');
@@ -60,8 +61,8 @@ const CaregiverDashboard = ({
   // Shift state
   // Shift expansion was removed by user request
 
-  // We log in as caretaker 'CT-001' (Anjali Deshmukh)
-  const caretakerId = 'CT-001';
+  // The current logged in caregiver id (e.g. CT-001)
+  const caretakerId = loggedInId || 'CT-001';
   const caretaker = globalState.caretakers?.find(c => c.id === caretakerId) || null;
   const allCaretakers = globalState.caretakers || [];
   const allPatients = globalState.patients || [];

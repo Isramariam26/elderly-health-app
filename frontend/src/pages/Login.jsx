@@ -15,13 +15,22 @@ const Login = ({ setLoggedInId }) => {
     setError('');
 
     if (role === 'caregiver') {
-      // For now, keep caregiver simple or map CT-001
-      if (userId === 'n1' && password === 'demn1') {
-        sessionStorage.setItem('care_nest_id', 'CT-001');
-        setLoggedInId('CT-001');
+      // Caregiver Login mapping: -n1 to -n5
+      let targetId = null;
+      if (userId === '-n1' && password === '-demn1') targetId = 'CT-001';
+      else if (userId === '-n2' && password === '-demn2') targetId = 'CT-002';
+      else if (userId === '-n3' && password === '-demn3') targetId = 'CT-003';
+      else if (userId === '-n4' && password === '-demn4') targetId = 'CT-004';
+      else if (userId === '-n5' && password === '-demn5') targetId = 'CT-005';
+      // demo fallback
+      else if (userId === 'n1' && password === 'demn1') targetId = 'CT-001';
+
+      if (targetId) {
+        sessionStorage.setItem('care_nest_id', targetId);
+        setLoggedInId(targetId);
         navigate('/caregiver');
       } else {
-        setError('Invalid caregiver credentials. Use n1 / demn1');
+        setError('Invalid caregiver credentials. Pattern: -n1 / -demn1');
       }
     } else {
       // Patient/Family Login logic: -c1/-demc1
