@@ -55,20 +55,8 @@ const CaregiverDashboard = ({
   // Shift state
   // Shift expansion was removed by user request
 
-  const [currentUser, setCurrentUser] = useState(() => {
-    const userStr = localStorage.getItem('currentUser');
-    if (userStr) {
-      const user = JSON.parse(userStr);
-      if (user.role === 'caregiver') return user;
-    }
-    return null;
-  });
-
-  useEffect(() => {
-    if (!currentUser) navigate('/login/caregiver');
-  }, [currentUser, navigate]);
-
-  const caretakerId = currentUser?.id;
+  // We log in as caretaker 'CT-001' (Anjali Deshmukh)
+  const caretakerId = 'CT-001';
   const caretaker = globalState.caretakers?.find(c => c.id === caretakerId) || null;
   const allCaretakers = globalState.caretakers || [];
   const allPatients = globalState.patients || [];
@@ -119,12 +107,10 @@ const CaregiverDashboard = ({
   const activeTasks = caretaker.tasks.filter(t => !t.completed);
   const completedTasks = caretaker.tasks.filter(t => t.completed);
 
-  // Time calculations with safe fallbacks
-  const shiftStart = caretaker.shiftStart ? new Date(caretaker.shiftStart) : null;
-  const shiftEnd = caretaker.shiftEnd ? new Date(caretaker.shiftEnd) : null;
-  const shiftRemainingMins = shiftEnd ? Math.max(0, Math.floor((shiftEnd - now) / (1000 * 60))) : 0;
-
-  const formatTime = (dateObj) => dateObj ? dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--:--';
+  // Time calculations
+  const shiftStart = new Date(caretaker.shiftStart);
+  const shiftEnd = new Date(caretaker.shiftEnd);
+  const shiftRemainingMins = Math.max(0, Math.floor((shiftEnd - now) / (1000 * 60)));
 
   const handleToggleTask = (taskId) => {
     sendCommand({ action: 'toggle_task', caretakerId, taskId });
@@ -271,7 +257,7 @@ const CaregiverDashboard = ({
     <div className="dashboard-content-wrapper" style={{maxWidth: '1200px', margin: '0 auto'}}>
       
       {/* Top Header */}
-      <header className="nurse-header" style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+      <header className="nurse-header">
         <div style={{display: 'flex', alignItems: 'center', gap: '24px'}}>
             <button className="icon-btn" onClick={() => navigate('/')}>&larr;</button>
             <div className="nurse-profile">
@@ -280,7 +266,7 @@ const CaregiverDashboard = ({
               </div>
               <div className="nurse-info">
                 <h3>{caretaker.name} <HeartPulse size={16} color="var(--accent-purple)" /></h3>
-                <p>{caretaker.role} • Shift: {formatTime(shiftStart)} - {formatTime(shiftEnd)}</p>
+                <p>{caretaker.role} • Shift: {shiftStart.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - {shiftEnd.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
                 
                 {/* LOCATION STATUS DISPLAY */}
                 <div style={{marginTop: '4px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem'}}>
@@ -298,16 +284,6 @@ const CaregiverDashboard = ({
               </div>
             </div>
         </div>
-        <button 
-          className="btn-secondary" 
-          onClick={() => {
-            localStorage.removeItem('currentUser');
-            navigate('/login/caregiver');
-          }}
-          style={{padding: '8px 16px', fontSize: '0.9rem'}}
-        >
-          Logout
-        </button>
       </header>
 
       {/* PERSISTENT ACTIVE EMERGENCY BANNER — visible to any logged-in caretaker */}
