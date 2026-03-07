@@ -285,11 +285,32 @@ wss.on('connection', (ws) => {
 
       // Location Management
       if (data.action === 'update_location') {
-        const p = state.patients.find(p => p.id === data.patientId);
-        if (p && data.lat && data.lng) {
-          p.location.lat = data.lat;
-          p.location.lng = data.lng;
-          if (data.locationName) p.location.name = data.locationName;
+        let updated = false;
+        if (data.patientId) {
+          const p = state.patients.find(p => p.id === data.patientId);
+          if (p && data.lat && data.lng) {
+            p.location.lat = data.lat;
+            p.location.lng = data.lng;
+            if (data.locationName) p.location.name = data.locationName;
+            updated = true;
+          }
+        } else if (data.caretakerId) {
+          const c = state.caretakers.find(c => c.id === data.caretakerId);
+          if (c && data.lat && data.lng) {
+            c.location.lat = data.lat;
+            c.location.lng = data.lng;
+            if (data.locationName) c.location.name = data.locationName;
+            updated = true;
+          }
+        }
+
+        if (updated) {
+          // Immediate broadcast for high-frequent location updates
+          wss.clients.forEach((client) => {
+            if (client.readyState === WebSocket.OPEN) {
+              client.send(JSON.stringify({ type: 'health_update', payload: state }));
+            }
+          });
         }
       }
 

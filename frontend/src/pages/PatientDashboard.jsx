@@ -28,7 +28,7 @@ const PatientDashboard = ({
         (position) => {
           sendCommand({
             action: 'update_location',
-            patientId: 'p1',
+            patientId: patient.id,
             lat: position.coords.latitude,
             lng: position.coords.longitude
           });

@@ -50,6 +50,26 @@ const CaregiverDashboard = ({
     sendCommand({ action: 'register_client', caregiverId: caretakerId, role: 'caregiver' });
   }, [caretakerId]);
 
+  // STAFF GEOLOCATION REPORTING
+  useEffect(() => {
+    if (!caretaker || !navigator.geolocation) return;
+
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        sendCommand({
+          action: 'update_location',
+          caretakerId: caretaker.id,
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude
+        });
+      },
+      (err) => console.warn("Staff Geolocation error:", err),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, [caretaker?.id]);
+
   if (!caretaker) return <div style={{padding: '40px', textAlign: 'center'}}>Loading Caregiver Data...</div>;
 
   const activeTasks = caretaker.tasks.filter(t => !t.completed);
@@ -126,6 +146,32 @@ const CaregiverDashboard = ({
       iconAnchor: [0, 0]
     });
 
+    // Helper for smooth marker animation
+    const smoothMove = (marker, newLat, newLng) => {
+      const startLatLng = marker.getLatLng();
+      const endLatLng = L.latLng(newLat, newLng);
+      if (startLatLng.equals(endLatLng)) return;
+
+      let start = null;
+      const duration = 2000; // Match synchronization interval
+
+      const animate = (timestamp) => {
+        if (!start) start = timestamp;
+        const progress = Math.min((timestamp - start) / duration, 1);
+        
+        const lat = startLatLng.lat + (endLatLng.lat - startLatLng.lat) * progress;
+        const lng = startLatLng.lng + (endLatLng.lng - startLatLng.lng) * progress;
+        
+        marker.setLatLng([lat, lng]);
+        
+        if (progress < 1) {
+          requestAnimationFrame(animate);
+        }
+      };
+      
+      requestAnimationFrame(animate);
+    };
+
     // Sync Markers
     const currentIds = new Set();
 
@@ -141,7 +187,7 @@ const CaregiverDashboard = ({
           .bindTooltip(`<b>Patient:</b> ${p.name}`, { direction: 'top', offset: [0, -25] })
           .bindPopup(`<b>${p.name}</b><br>${p.location.name}<br>Status: ${activeEmergency?.patientId === p.id ? 'EMERGENCY' : 'Normal'}`);
       } else {
-        markersRef.current[p.id].setLatLng([p.location.lat, p.location.lng]);
+        smoothMove(markersRef.current[p.id], p.location.lat, p.location.lng);
         markersRef.current[p.id].setIcon(createIcon(color, p.name, 'Patient'));
       }
     });
@@ -160,7 +206,7 @@ const CaregiverDashboard = ({
           .bindTooltip(`<b>Caregiver:</b> ${c.name}`, { direction: 'top', offset: [0, -25] })
           .bindPopup(`<b>${c.name}</b><br>${c.role}`);
       } else {
-        markersRef.current[c.id].setLatLng([c.location.lat, c.location.lng]);
+        smoothMove(markersRef.current[c.id], c.location.lat, c.location.lng);
         markersRef.current[c.id].setIcon(createIcon(color, displayName, 'Caregiver'));
       }
     });
