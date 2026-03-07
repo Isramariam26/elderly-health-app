@@ -10,7 +10,8 @@ import './index.css';
 function App() {
   const [globalState, setGlobalState] = useState({ patients: [], caretakers: [], activeEmergency: null });
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
-  const [activeAlarm, setActiveAlarm] = useState(null); // For the targeted emergency alarm popup
+  const [activeAlarm, setActiveAlarm] = useState(null); 
+  const [loggedInId, setLoggedInId] = useState(sessionStorage.getItem('care_nest_id') || null);
   const wsRef = useRef(null);
 
   useEffect(() => {
@@ -98,8 +99,8 @@ function App() {
       <div className="app-container">
         <Routes>
           <Route path="/" element={<RoleSelection />} />
-          <Route path="/portal-selection" element={<PortalSelection />} />
-          <Route path="/login/:role" element={<Login />} />
+          <Route path="/portal/:role" element={<PortalSelection />} />
+          <Route path="/login/:role" element={<Login setLoggedInId={setLoggedInId} />} />
           
           <Route path="/patient" element={
             <PatientDashboard 
@@ -109,6 +110,7 @@ function App() {
               connectionStatus={connectionStatus}
               sendCommand={sendCommand}
               role="patient"
+              loggedInId={loggedInId}
             />
           } />
 
@@ -120,6 +122,7 @@ function App() {
               connectionStatus={connectionStatus}
               sendCommand={sendCommand}
               role="family"
+              loggedInId={loggedInId}
             />
           } />
           

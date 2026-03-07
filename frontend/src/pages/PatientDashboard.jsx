@@ -31,7 +31,8 @@ const PatientDashboard = ({
   getSpo2Status, 
   connectionStatus, 
   sendCommand,
-  role 
+  role,
+  loggedInId
 }) => {
   const navigate = useNavigate();
   const [newMedName, setNewMedName] = useState('');
@@ -58,8 +59,9 @@ const PatientDashboard = ({
     }
   };
 
-  // For demo purposes, we log in as patient 'GF-001' (Ramesh Patil)
-  const patient = globalState.patients?.find(p => p.id === 'GF-001');
+  // The current logged in patient id (e.g. GF-001) passed from App.jsx or defaulting to GF-001
+  const effectiveId = loggedInId || 'GF-001';
+  const patient = globalState.patients?.find(p => p.id === effectiveId);
   const caretakers = globalState.caretakers || [];
 
   React.useEffect(() => {
