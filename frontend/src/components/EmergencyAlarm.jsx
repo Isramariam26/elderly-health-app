@@ -1,10 +1,6 @@
 import React, { useEffect, useState } from 'react';
 
 // ─── MODULE-LEVEL SINGLETON ALARM ─────────────────────────────────────────────
-// Only ONE alarm can play at a time. Any call to stopAlarm() kills it instantly.
-// ─── MODULE-LEVEL SINGLETON ALARM ─────────────────────────────────────────────
-// We keep the AudioContext ALIVE once created. Closing it can cause the browser
-// to forget the user-gesture authorization.
 let _alarmCtx = null;
 let _alarmStopped = true;
 let _alarmTimeoutId = null;
@@ -25,7 +21,6 @@ const stopAlarm = () => {
     clearTimeout(_alarmTimeoutId);
     _alarmTimeoutId = null;
   }
-  // DO NOT close the context here, just let it sit idle.
 };
 
 const startAlarm = () => {
@@ -33,46 +28,42 @@ const startAlarm = () => {
   const ctx = getAudioCtx();
   if (!ctx) return;
 
-  // Attempt to resume immediately
   if (ctx.state === 'suspended') {
-    ctx.resume().catch(() => {
-      console.warn("AudioContext suspended. Waiting for user interaction to play sound.");
-    });
+    ctx.resume().catch(() => console.warn("Audio suspended"));
   }
 
-  let iter = 0;
-  const beep = () => {
+  const playSiren = () => {
     if (_alarmStopped || !ctx) return;
 
-    // Double check state in the loop
     if (ctx.state === 'running') {
+      const duration = 0.5;
+      const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0.8, ctx.currentTime);
-      gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.22);
+
+      osc.type = 'triangle';
+      // Siren sweep: 600Hz to 1200Hz
+      osc.frequency.setValueAtTime(600, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + duration);
+
+      gain.gain.setValueAtTime(0, ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(1, ctx.currentTime + 0.05);
+      gain.gain.linearRampToValueAtTime(0, ctx.currentTime + duration);
+
+      osc.connect(gain);
       gain.connect(ctx.destination);
 
-      const osc = ctx.createOscillator();
-      osc.type = 'square';
-      osc.frequency.setValueAtTime(iter % 2 === 0 ? 960 : 720, ctx.currentTime);
-      osc.connect(gain);
       osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.25);
-      iter++;
+      osc.stop(ctx.currentTime + duration);
     }
 
-    _alarmTimeoutId = setTimeout(beep, 340);
+    _alarmTimeoutId = setTimeout(playSiren, 600);
   };
 
-  beep();
+  playSiren();
 
-  // Interaction handlers to ensure sound starts the moment the user touches the app
-  const unlock = () => {
-    if (ctx.state === 'suspended') {
-      ctx.resume().then(() => console.log("AudioContext resumed via interaction"));
-    }
-  };
+  const unlock = () => { if (ctx.state === 'suspended') ctx.resume(); };
   window.addEventListener('click', unlock, { once: true });
-  window.addEventListener('keydown', unlock, { once: true });
+  window.addEventListener('touchstart', unlock, { once: true });
 
   if (navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 500]);
 };
@@ -80,29 +71,37 @@ const startAlarm = () => {
 // ─── Component ────────────────────────────────────────────────────────────────
 const EmergencyAlarm = ({ alarm, onDismiss, sendCommand }) => {
   const [elapsed, setElapsed] = useState(0);
+  const [audioState, setAudioState] = useState('unknown');
 
   useEffect(() => {
     if (!alarm) return;
-
     startAlarm();
+
+    const checkAudio = setInterval(() => {
+      const ctx = getAudioCtx();
+      setAudioState(ctx ? ctx.state : 'unsupported');
+    }, 500);
 
     const timer = setInterval(() => setElapsed(s => s + 1), 1000);
 
-    // Cleanup: stop alarm if component unmounts without dismiss
     return () => {
       stopAlarm();
       clearInterval(timer);
+      clearInterval(checkAudio);
     };
   }, [alarm?.patientId]);
 
   const handleDismiss = () => {
-    // Stop alarm immediately — no exceptions
     stopAlarm();
-    // Clear server-side emergency so all banners disappear
     if (sendCommand && alarm?.patientId) {
       sendCommand({ action: 'clear_emergency', patientId: alarm.patientId });
     }
     onDismiss();
+  };
+
+  const unlockAudioManually = () => {
+    const ctx = getAudioCtx();
+    if (ctx) ctx.resume();
   };
 
   if (!alarm) return null;
@@ -122,100 +121,88 @@ const EmergencyAlarm = ({ alarm, onDismiss, sendCommand }) => {
     }}>
       <style>{`
         @keyframes alarmPulse {
-          0%, 100% { background-color: rgba(0,0,0,0.88); }
-          50% { background-color: rgba(180,0,0,0.88); }
+          0%, 100% { background-color: rgba(0,0,0,0.9); }
+          50% { background-color: rgba(150,0,0,0.9); }
         }
         @keyframes shake {
           0%, 100% { transform: translateX(0); }
-          20% { transform: translateX(-8px); }
-          40% { transform: translateX(8px); }
-          60% { transform: translateX(-4px); }
-          80% { transform: translateX(4px); }
+          10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+          20%, 40%, 60%, 80% { transform: translateX(5px); }
         }
       `}</style>
 
       <div style={{
-        background: 'linear-gradient(135deg, #1a0000 0%, #3d0000 100%)',
-        border: '3px solid #ef4444',
-        borderRadius: '24px',
-        padding: '40px',
-        maxWidth: '520px',
+        background: '#1a0000',
+        border: '4px solid #ef4444',
+        borderRadius: '28px',
+        padding: '32px',
+        maxWidth: '480px',
         width: '90%',
-        boxShadow: '0 0 60px rgba(239,68,68,0.6), 0 0 120px rgba(239,68,68,0.3)',
-        animation: 'shake 0.5s ease-in-out 0.3s 2',
+        boxShadow: '0 0 50px rgba(239,68,68,0.5)',
+        animation: 'shake 0.8s cubic-bezier(.36,.07,.19,.97) both',
         color: 'white',
+        textAlign: 'center'
       }}>
-
         {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-          <div style={{ fontSize: '4rem', lineHeight: 1 }}>🚨</div>
-          <div style={{
-            fontSize: '0.72rem', fontWeight: 700, letterSpacing: '4px',
-            color: '#ef4444', textTransform: 'uppercase', marginTop: '8px'
-          }}>EMERGENCY — DISPATCHED TO YOU</div>
+        <div style={{ fontSize: '3.5rem', marginBottom: '10px' }}>🚨</div>
+        <div style={{ color: '#ef4444', fontWeight: 900, fontSize: '0.8rem', letterSpacing: '3px', marginBottom: '20px' }}>
+          CRITICAL EMERGENCY
         </div>
 
-        {/* Patient */}
-        <h1 style={{ fontSize: '2rem', fontWeight: 800, textAlign: 'center', margin: '0 0 4px 0' }}>
-          {alarm.patientName}
-        </h1>
-        <p style={{ textAlign: 'center', color: '#fca5a5', margin: '0 0 24px 0' }}>
-          📍 {alarm.locationName}
-        </p>
+        <h1 style={{ fontSize: '2.2rem', fontWeight: 800, margin: '0 0 8px 0' }}>{alarm.patientName}</h1>
+        <p style={{ color: '#fca5a5', fontSize: '1.1rem', marginBottom: '24px' }}>📍 {alarm.locationName}</p>
 
-        {/* Vitals Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '24px' }}>
+        {/* Audio Status Check */}
+        <div 
+          onClick={unlockAudioManually}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: '8px',
+            padding: '8px 16px', borderRadius: '20px', fontSize: '0.85rem',
+            background: audioState === 'running' ? 'rgba(34,197,94,0.2)' : 'rgba(234,179,8,0.2)',
+            border: `1px solid ${audioState === 'running' ? '#22c55e' : '#eab308'}`,
+            color: audioState === 'running' ? '#4ade80' : '#fde047',
+            marginBottom: '30px', cursor: 'pointer'
+          }}>
+          {audioState === 'running' ? '🔊 Sound is playing' : '🔇 Browser muted sound — Click to unmute'}
+        </div>
+
+        {/* Vitals */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '30px' }}>
           {[
-            { label: 'Heart Rate',     value: `${alarm.status?.hr || '--'} BPM`, icon: '💓' },
-            { label: 'Blood Pressure', value: alarm.status?.bp || '--',           icon: '🩸' },
-            { label: 'SpO₂',           value: `${alarm.status?.spO2 || '--'}%`,   icon: '🫁' },
-            { label: 'Temperature',    value: `${alarm.status?.temp || '--'}°C`,  icon: '🌡️' },
+            { label: 'Heart Rate', value: `${alarm.status?.hr || '--'}`, unit: 'BPM' },
+            { label: 'SpO2', value: `${alarm.status?.spO2 || '--'}`, unit: '%' },
           ].map(v => (
-            <div key={v.label} style={{
-              background: 'rgba(239,68,68,0.15)',
-              border: '1px solid rgba(239,68,68,0.3)',
-              borderRadius: '12px', padding: '12px', textAlign: 'center'
-            }}>
-              <div style={{ fontSize: '1.4rem' }}>{v.icon}</div>
-              <div style={{ fontSize: '1.15rem', fontWeight: 700 }}>{v.value}</div>
-              <div style={{ fontSize: '0.68rem', color: '#fca5a5', marginTop: '2px' }}>{v.label}</div>
+            <div key={v.label} style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '15px' }}>
+              <div style={{ fontSize: '1.8rem', fontWeight: 800 }}>{v.value}</div>
+              <div style={{ fontSize: '0.75rem', color: '#fca5a5' }}>{v.label} ({v.unit})</div>
             </div>
           ))}
         </div>
 
-        {/* Why you */}
-        {alarm.assignmentReason && (
-          <div style={{
-            background: 'rgba(255,255,255,0.06)', borderRadius: '12px',
-            padding: '14px', marginBottom: '20px', fontSize: '0.88rem',
-            color: '#fde68a', textAlign: 'center'
-          }}>
-            <strong>Why you?</strong><br />{alarm.assignmentReason}
-          </div>
-        )}
-
-        {/* Elapsed */}
-        <div style={{ textAlign: 'center', color: '#fca5a5', fontSize: '0.82rem', marginBottom: '20px' }}>
-          Alert triggered {formatElapsed(elapsed)}
-        </div>
-
-        {/* THE BUTTON */}
+        {/* Action */}
         <button
           onClick={handleDismiss}
           style={{
-            width: '100%', padding: '20px',
-            background: '#16a34a',
-            color: 'white', border: '2px solid rgba(255,255,255,0.3)',
-            borderRadius: '14px', fontSize: '1.15rem', fontWeight: 800,
-            cursor: 'pointer', letterSpacing: '0.5px',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.5)'
+            width: '100%', padding: '22px',
+            background: '#ef4444', color: 'white',
+            border: 'none', borderRadius: '16px',
+            fontSize: '1.2rem', fontWeight: 800,
+            cursor: 'pointer', transition: 'transform 0.2s',
+            boxShadow: '0 8px 20px rgba(239,68,68,0.4)'
           }}
+          onMouseDown={e => e.currentTarget.style.transform = 'scale(0.98)'}
+          onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
         >
-          ✅ Acknowledged and Cleared — Stop Alarm
+          ACKNOWLEDGE & CLEAR
         </button>
+
+        <div style={{ marginTop: '20px', color: '#fca5a5', fontSize: '0.8rem' }}>
+          Alert triggered {formatElapsed(elapsed)}
+        </div>
       </div>
     </div>
   );
 };
 
 export default EmergencyAlarm;
+
