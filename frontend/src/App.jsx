@@ -99,7 +99,7 @@ function App() {
       <div className="app-container">
         <Routes>
           <Route path="/" element={<RoleSelection />} />
-          <Route path="/portal/:role" element={<PortalSelection />} />
+          <Route path="/portal-selection" element={<PortalSelection />} />
           <Route path="/login/:role" element={<Login setLoggedInId={setLoggedInId} />} />
           
           <Route path="/patient" element={
