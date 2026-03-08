@@ -21,64 +21,65 @@ function App() {
     let fallbackTimer;
 
     const connectWS = () => {
-      // Connect to websocket if running locally
-      ws = new WebSocket('ws://localhost:5000');
-      wsRef.current = ws;
-
       // Start a fallback timer. If no live data arrives in 1.5 seconds, use mock data
       fallbackTimer = setTimeout(() => {
         setGlobalState(prev => prev.caretakers.length === 0 ? fallbackData : prev);
       }, 1500);
 
-      ws.onopen = () => {
-        console.log('Connected to health monitoring server');
-        setConnectionStatus('connected');
-      };
+      try {
+        // Connect to websocket if running locally. On HTTPS pages (GitHub Pages), this synchronously throws a SecurityError.
+        ws = new WebSocket('ws://localhost:5000');
+        wsRef.current = ws;
 
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.type === 'health_update') {
-            const newState = data.payload;
-            clearTimeout(fallbackTimer); // We have live data, clear fallback
-            setGlobalState(newState);
+        ws.onopen = () => {
+          console.log('Connected to health monitoring server');
+          setConnectionStatus('connected');
+        };
 
-            // AUTO-SYNC: If we have an active targeted alarm, check if it's still active in globalState
-            setActiveAlarm(prev => {
-              if (!prev) return null;
-              const patient = newState.patients?.find(p => p.id === prev.patientId);
-              // If patient not found or emergency cleared, close the popup
-              if (!patient || !patient.emergencyTriggered) return null;
-              return prev;
-            });
-          } else if (data.type === 'connection_status') {
-            console.log(data.payload.message);
-          } else if (data.type === 'emergency_alarm') {
-            // Targeted alarm for the assigned caregiver
-            setActiveAlarm(data.payload);
-          } else if (data.type === 'emergency_dispatched') {
-            // Broadcast to ALL clients — trigger alarm sound on every caregiver session
-            setActiveAlarm(data.payload);
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.type === 'health_update') {
+              const newState = data.payload;
+              clearTimeout(fallbackTimer); // We have live data, clear fallback
+              setGlobalState(newState);
+
+              // AUTO-SYNC: If we have an active targeted alarm, check if it's still active in globalState
+              setActiveAlarm(prev => {
+                if (!prev) return null;
+                const patient = newState.patients?.find(p => p.id === prev.patientId);
+                if (!patient || !patient.emergencyTriggered) return null;
+                return prev;
+              });
+            } else if (data.type === 'connection_status') {
+              console.log(data.payload.message);
+            } else if (data.type === 'emergency_alarm') {
+              setActiveAlarm(data.payload);
+            } else if (data.type === 'emergency_dispatched') {
+              setActiveAlarm(data.payload);
+            }
+          } catch (error) {
+            console.error("Failed to parse WebSocket message", error);
           }
-        } catch (error) {
-          console.error("Failed to parse WebSocket message", error);
-        }
-      };
+        };
 
-      ws.onclose = () => {
-        console.log('WebSocket disconnected. Reconnecting in 3s...');
-        // Ensure UI doesn't hang if backend offline when opening app
+        ws.onclose = () => {
+          console.log('WebSocket disconnected. Reconnecting in 3s...');
+          setGlobalState(prev => prev.caretakers.length === 0 ? fallbackData : prev);
+          setConnectionStatus('disconnected');
+          wsRef.current = null;
+          reconnectTimeout = setTimeout(connectWS, 3000);
+        };
+
+        ws.onerror = (err) => {
+          console.error('WebSocket error:', err);
+          ws.close();
+        };
+      } catch (err) {
+        console.warn('WebSocket could not be initialized (likely HTTPS mixed content blocking). Falling back to mock data.', err);
         setGlobalState(prev => prev.caretakers.length === 0 ? fallbackData : prev);
-
         setConnectionStatus('disconnected');
-        wsRef.current = null;
-        reconnectTimeout = setTimeout(connectWS, 3000);
-      };
-
-      ws.onerror = (err) => {
-        console.error('WebSocket error:', err);
-        ws.close();
-      };
+      }
     };
 
     connectWS();
