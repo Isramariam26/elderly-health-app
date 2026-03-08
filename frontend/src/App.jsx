@@ -94,6 +94,74 @@ function App() {
   const sendCommand = (cmdObj) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify(cmdObj));
+    } else {
+      // OFFLINE FALLBACK: Simulate backend logic locally purely for UI interactivity on GitHub Pages
+      setGlobalState(prev => {
+        const next = JSON.parse(JSON.stringify(prev)); // Deep copy to mutate
+        
+        switch (cmdObj.action) {
+          case 'check_medication': {
+            const p = next.patients?.find(p => p.id === cmdObj.patientId);
+            if (p) {
+              const med = p.medications?.find(m => m.id === cmdObj.medId);
+              if (med) {
+                med.taken = !med.taken;
+                if (med.taken) med.takenAt = new Date().toISOString();
+                else med.takenAt = null;
+              }
+            }
+            break;
+          }
+          case 'update_location': {
+            if (cmdObj.patientId) {
+              const p = next.patients?.find(p => p.id === cmdObj.patientId);
+              if (p) {
+                if (!p.location) p.location = {};
+                p.location.lat = cmdObj.lat;
+                p.location.lng = cmdObj.lng;
+                if (cmdObj.locationName) p.location.name = cmdObj.locationName;
+              }
+            } else if (cmdObj.caretakerId) {
+               const c = next.caretakers?.find(c => c.id === cmdObj.caretakerId);
+               if (c && c.location) {
+                 c.location.lat = cmdObj.lat;
+                 c.location.lng = cmdObj.lng;
+               }
+            }
+            break;
+          }
+          case 'trigger_emergency': {
+             const p = next.patients?.find(p => p.id === cmdObj.patientId);
+             if (p) p.emergencyTriggered = true;
+             
+             // Simulate server broadcast
+             setTimeout(() => {
+               setActiveAlarm({ 
+                 patientId: cmdObj.patientId, 
+                 patientName: p?.name || 'Unknown Patient', 
+                 location: p?.location?.name || 'Unknown Location', 
+                 severity: cmdObj.severity || 'high'
+               });
+             }, 100);
+             break;
+          }
+          case 'clear_emergency': {
+             const p = next.patients?.find(p => p.id === cmdObj.patientId);
+             if (p) p.emergencyTriggered = false;
+             setTimeout(() => setActiveAlarm(null), 100);
+             break;
+          }
+          case 'toggle_task': {
+             const c = next.caretakers?.find(c => c.id === cmdObj.caretakerId);
+             if (c) {
+               const t = c.tasks?.find(t => t.id === cmdObj.taskId);
+               if (t) t.completed = !t.completed;
+             }
+             break;
+          }
+        }
+        return next;
+      });
     }
   };
 
