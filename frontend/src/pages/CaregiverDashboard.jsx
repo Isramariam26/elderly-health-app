@@ -67,7 +67,7 @@ const CaregiverDashboard = ({
 
   // Tasks state for forms
   const [newTaskText, setNewTaskText] = useState('');
-  const [newTaskPatientId, setNewTaskPatientId] = useState('p1');
+  const [newTaskPatientId, setNewTaskPatientId] = useState('GF-001');
   const [newTaskIsInterruptible, setNewTaskIsInterruptible] = useState(true);
   
   // Shift state
@@ -270,6 +270,17 @@ const CaregiverDashboard = ({
       }
     });
 
+    // Fit bounds only if we have markers and map is fresh
+    if (currentIds.size > 0 && mapInstance.current) {
+       const group = L.featureGroup(Object.values(markersRef.current));
+       mapInstance.current.fitBounds(group.getBounds(), { padding: [50, 50], maxZoom: 16 });
+    }
+
+    // Cleanup logic
+    return () => {
+       // Optional: cleanup markers if needed
+    };
+
     // Remove old markers
     Object.keys(markersRef.current).forEach(id => {
       if (!currentIds.has(id)) {
@@ -278,7 +289,7 @@ const CaregiverDashboard = ({
       }
     });
 
-  }, [activeTab, allPatients, allCaretakers, leafletReady]);
+  }, [allPatients, allCaretakers, activeEmergency, leafletReady]);
 
   return (
     <div className="dashboard-content-wrapper" style={{maxWidth: '1200px', margin: '0 auto'}}>
@@ -462,10 +473,42 @@ const CaregiverDashboard = ({
                  <div style={{fontSize: '0.85rem', color: 'var(--text-muted)'}}>Real-time Tracking</div>
                </div>
                
-               <div ref={mapRef} style={{width: '100%', height: '450px', backgroundColor: '#eef2f5', borderRadius: '12px', border: '1px solid var(--border-color)', zIndex: 1}}>
+               <div ref={mapRef} style={{width: '100%', height: '450px', backgroundColor: '#eef2f5', borderRadius: '12px', border: '1px solid var(--border-color)', zIndex: 1, position: 'relative'}}>
                  {!leafletReady && (
-                   <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100%',color:'var(--text-muted)',fontSize:'0.9rem'}}>Loading map...</div>
+                   <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100%',color:'var(--text-muted)',fontSize:'0.9rem'}}>Loading map infrastructure...</div>
                  )}
+               </div>
+            </section>
+
+            {/* Smart Dispatch Demonstration (Requested by User) */}
+            <section className="info-section" style={{background: 'linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%)', border: '1px solid #bfdbfe'}}>
+               <div className="section-title">
+                 <div style={{color: 'var(--accent-blue)'}}><Activity size={20} className="icon" /> Smart Dispatch Simulator</div>
+                 <span className="status-badge" style={{backgroundColor: '#dbeafe', color: '#1e40af'}}>Demo Active</span>
+               </div>
+               <p style={{fontSize: '0.95rem', color: '#4b5563', marginBottom: '20px'}}>
+                 The system automatically routes emergency alerts to the <strong>best-fit caretaker</strong> using a non-linear scoring algorithm:
+               </p>
+               <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px'}}>
+                 <div style={{backgroundColor: 'white', padding: '16px', borderRadius: '12px', border: '1px solid #e5e7eb'}}>
+                   <div style={{fontWeight: 700, marginBottom: '4px', fontSize: '0.9rem', color: 'var(--accent-purple)'}}>📍 Proximity</div>
+                   <div style={{fontSize: '0.85rem', color: 'var(--text-muted)'}}>Real-time GPS distance calculation (weight: 40%)</div>
+                 </div>
+                 <div style={{backgroundColor: 'white', padding: '16px', borderRadius: '12px', border: '1px solid #e5e7eb'}}>
+                   <div style={{fontWeight: 700, marginBottom: '4px', fontSize: '0.9rem', color: 'var(--accent-teal-dark)'}}>🧠 Skill Match</div>
+                   <div style={{fontSize: '0.85rem', color: 'var(--text-muted)'}}>Matches severity to training (RN vs GNM) (weight: 30%)</div>
+                 </div>
+                 <div style={{backgroundColor: 'white', padding: '16px', borderRadius: '12px', border: '1px solid #e5e7eb'}}>
+                   <div style={{fontWeight: 700, marginBottom: '4px', fontSize: '0.9rem', color: 'var(--accent-red)'}}>🔥 Burnout Logic</div>
+                   <div style={{fontSize: '0.85rem', color: 'var(--text-muted)'}}>Penalizes caretakers near end-of-shift (weight: 20%)</div>
+                 </div>
+                 <div style={{backgroundColor: 'white', padding: '16px', borderRadius: '12px', border: '1px solid #e5e7eb'}}>
+                   <div style={{fontWeight: 700, marginBottom: '4px', fontSize: '0.9rem', color: 'var(--accent-blue)'}}>⏸️ Interruptibility</div>
+                   <div style={{fontSize: '0.85rem', color: 'var(--text-muted)'}}>Checks active task criticalities (weight: 10%)</div>
+                 </div>
+               </div>
+               <div style={{marginTop: '20px', padding: '12px', borderRadius: '8px', backgroundColor: 'rgba(59, 130, 246, 0.1)', color: '#1e40af', fontSize: '0.85rem', fontWeight: 600, textAlign: 'center'}}>
+                 💡 Trigger an emergency from the Patient Dashboard to see routing in action!
                </div>
             </section>
           </div>
