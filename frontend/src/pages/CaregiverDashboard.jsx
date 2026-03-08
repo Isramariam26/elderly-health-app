@@ -188,7 +188,6 @@ const CaregiverDashboard = ({
       // Force tiles to render after container is fully laid out
       setTimeout(() => mapInstance.current?.invalidateSize(), 300);
     }
-
     // Helper for custom icons with labels
     const createMarkerHTML = (color, name, role) => `
       <div style="display: flex; flex-direction: column; align-items: center; transform: translate(-50%, -100%);">
