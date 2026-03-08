@@ -139,8 +139,14 @@ function App() {
                setActiveAlarm({ 
                  patientId: cmdObj.patientId, 
                  patientName: p?.name || 'Unknown Patient', 
-                 location: p?.location?.name || 'Unknown Location', 
-                 severity: cmdObj.severity || 'high'
+                 locationName: p?.location?.name || 'Unknown Location', 
+                 severity: cmdObj.severity || 'high',
+                 status: {
+                   hr: p?.hr,
+                   bp: `${p?.systolic}/${p?.diastolic}`,
+                   spO2: p?.spO2,
+                   temp: p?.temp?.toFixed(1)
+                 }
                });
              }, 100);
              break;
