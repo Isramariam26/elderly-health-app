@@ -26,6 +26,8 @@ const CaregiverDashboard = ({
   
   // Real-time clock for shift tracking
   const [now, setNow] = useState(new Date());
+  // Sound enable state
+  const [soundEnabled, setSoundEnabled] = useState(false);
   // Location and Permission state
   const [userCoords, setUserCoords] = useState(null);
   const [userAddress, setUserAddress] = useState('Locating...');
@@ -72,6 +74,12 @@ const CaregiverDashboard = ({
   useEffect(() => {
     sendCommand({ action: 'register_client', caregiverId: caretakerId, role: 'caregiver' });
   }, [caretakerId]);
+
+  // Enable alarm sound after a user gesture (required by browsers)
+  const handleEnableSound = async () => {
+    const ok = await authorizeAudio();
+    setSoundEnabled(ok);
+  };
 
   // STAFF GEOLOCATION REPORTING
   useEffect(() => {
@@ -298,6 +306,22 @@ const CaregiverDashboard = ({
             </div>
           </div>
         </div>
+        {/* Enable Sound button */}
+        <button
+          onClick={handleEnableSound}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '8px',
+            padding: '10px 20px', borderRadius: '999px', border: 'none',
+            cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem',
+            backgroundColor: soundEnabled ? '#16a34a' : '#dc2626',
+            color: 'white',
+            boxShadow: soundEnabled ? '0 0 0 3px rgba(22,163,74,0.3)' : '0 0 0 3px rgba(220,38,38,0.3)',
+            transition: 'all 0.3s ease',
+            animation: soundEnabled ? 'none' : 'btnPulse 1.5s ease-in-out infinite'
+          }}
+        >
+          {soundEnabled ? '🔊 Sound On' : '🔇 Enable Alarm Sound'}
+        </button>
       </header>
 
       {/* PERSISTENT ACTIVE EMERGENCY BANNER — visible to any logged-in caretaker */}
