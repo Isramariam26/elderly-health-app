@@ -1,11 +1,10 @@
 import React, { useEffect, useState } from 'react';
-
 import { getAudioCtx } from '../utils/audioService';
 
 // ─── MODULE-LEVEL CONTROL ─────────────────────────────────────────────────────
 let _alarmStopped = true;
 let _alarmTimeoutId = null;
-
+let _alarmIter = 0;
 
 const stopAlarm = () => {
   _alarmStopped = true;
@@ -15,45 +14,65 @@ const stopAlarm = () => {
   }
 };
 
+const playBeep = (ctx) => {
+  if (!ctx || ctx.state !== 'running') return;
+  const duration = 0.4;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'square';
+  osc.frequency.setValueAtTime(_alarmIter % 2 === 0 ? 1000 : 700, ctx.currentTime);
+  gain.gain.setValueAtTime(0.6, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(ctx.currentTime);
+  osc.stop(ctx.currentTime + duration);
+  _alarmIter++;
+};
+
+const scheduleNext = () => {
+  _alarmTimeoutId = setTimeout(() => {
+    if (_alarmStopped) return;
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+
+    if (ctx.state === 'suspended') {
+      // Try to resume, then play once resumed
+      ctx.resume().then(() => {
+        playBeep(ctx);
+        scheduleNext();
+      }).catch(() => scheduleNext());
+    } else {
+      playBeep(ctx);
+      scheduleNext();
+    }
+  }, 450);
+};
+
 const startAlarm = () => {
+  if (!_alarmStopped) return; // already running
   _alarmStopped = false;
+  _alarmIter = 0;
+
   const ctx = getAudioCtx();
   if (!ctx) return;
 
-  const playSiren = () => {
-    if (_alarmStopped || !ctx) return;
+  if (ctx.state === 'suspended') {
+    // Resume first, then start the loop
+    ctx.resume().then(() => {
+      playBeep(ctx);
+      scheduleNext();
+    }).catch(() => scheduleNext()); // still schedule even if resume fails (user may click later)
+  } else {
+    playBeep(ctx);
+    scheduleNext();
+  }
 
-    // Aggressively attempt to resume if suspended
-    if (ctx.state === 'suspended') {
-      ctx.resume().catch(() => {});
-    }
-
-    if (ctx.state === 'running') {
-      const duration = 0.4;
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      osc.type = 'square';
-      osc.frequency.setValueAtTime(iter % 2 === 0 ? 1000 : 700, ctx.currentTime);
-      
-      gain.gain.setValueAtTime(0.6, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + duration);
-      iter++;
-    }
-
-    _alarmTimeoutId = setTimeout(playSiren, 450);
+  // Register unlock on any interaction anywhere on the page
+  const unlock = () => {
+    const c = getAudioCtx();
+    if (c && c.state === 'suspended') c.resume();
   };
-
-  let iter = 0;
-  playSiren();
-
-  const unlock = () => { if (ctx && ctx.state === 'suspended') ctx.resume(); };
   window.addEventListener('click', unlock, { once: true });
   window.addEventListener('touchstart', unlock, { once: true });
   window.addEventListener('keydown', unlock, { once: true });
@@ -92,23 +111,24 @@ const EmergencyAlarm = ({ alarm, onDismiss, sendCommand }) => {
     onDismiss();
   };
 
+  // Called when user clicks the muted-sound pill — activates audio via user gesture
   const unlockAudioManually = async () => {
     const ctx = getAudioCtx();
-    if (ctx) {
-      if (ctx.state === 'suspended') {
-        try {
-          await ctx.resume();
-          setAudioState('running');
-        } catch (e) {
-          console.error("Manual resume failed:", e);
-        }
-      } else {
+    if (!ctx) return;
+    if (ctx.state === 'suspended') {
+      try {
+        await ctx.resume();
+        setAudioState('running');
+        // Restart the beep loop now that context is running
+        stopAlarm();
         startAlarm();
+      } catch (e) {
+        console.error('Manual resume failed:', e);
       }
+    } else if (_alarmStopped) {
+      startAlarm();
     }
   };
-
-
 
   if (!alarm) return null;
 
@@ -149,7 +169,6 @@ const EmergencyAlarm = ({ alarm, onDismiss, sendCommand }) => {
         color: 'white',
         textAlign: 'center'
       }}>
-        {/* Header */}
         <div style={{ fontSize: '3.5rem', marginBottom: '10px' }}>🚨</div>
         <div style={{ color: '#ef4444', fontWeight: 900, fontSize: '0.8rem', letterSpacing: '3px', marginBottom: '20px' }}>
           CRITICAL EMERGENCY
@@ -158,8 +177,8 @@ const EmergencyAlarm = ({ alarm, onDismiss, sendCommand }) => {
         <h1 style={{ fontSize: '2.2rem', fontWeight: 800, margin: '0 0 8px 0' }}>{alarm.patientName}</h1>
         <p style={{ color: '#fca5a5', fontSize: '1.1rem', marginBottom: '24px' }}>📍 {alarm.locationName}</p>
 
-        {/* Audio Status Check */}
-        <div 
+        {/* Audio Status — click to unmute */}
+        <div
           onClick={unlockAudioManually}
           style={{
             display: 'inline-flex', alignItems: 'center', gap: '8px',
@@ -167,9 +186,9 @@ const EmergencyAlarm = ({ alarm, onDismiss, sendCommand }) => {
             background: audioState === 'running' ? 'rgba(34,197,94,0.2)' : 'rgba(234,179,8,0.2)',
             border: `1px solid ${audioState === 'running' ? '#22c55e' : '#eab308'}`,
             color: audioState === 'running' ? '#4ade80' : '#fde047',
-            marginBottom: '30px', cursor: 'pointer'
+            marginBottom: '30px', cursor: 'pointer', userSelect: 'none'
           }}>
-          {audioState === 'running' ? '🔊 Sound is playing' : '🔇 Browser muted sound — Click to unmute'}
+          {audioState === 'running' ? '🔊 Alarm is ringing' : '🔇 Browser blocked sound — Tap here to activate'}
         </div>
 
         {/* Vitals */}
@@ -185,7 +204,7 @@ const EmergencyAlarm = ({ alarm, onDismiss, sendCommand }) => {
           ))}
         </div>
 
-        {/* Action */}
+        {/* Dismiss */}
         <button
           onClick={handleDismiss}
           style={{
@@ -199,7 +218,7 @@ const EmergencyAlarm = ({ alarm, onDismiss, sendCommand }) => {
           onMouseDown={e => e.currentTarget.style.transform = 'scale(0.98)'}
           onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
         >
-          ACKNOWLEDGE & CLEAR
+          ACKNOWLEDGE &amp; CLEAR
         </button>
 
         <div style={{ marginTop: '20px', color: '#fca5a5', fontSize: '0.8rem' }}>
@@ -211,4 +230,3 @@ const EmergencyAlarm = ({ alarm, onDismiss, sendCommand }) => {
 };
 
 export default EmergencyAlarm;
-

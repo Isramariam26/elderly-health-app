@@ -9,17 +9,47 @@ import { getAudioCtx, authorizeAudio } from '../utils/audioService';
 let _patientAlarmStopped = true;
 let _patientAlarmTimeoutId = null;
 let _patientManualSilence = false; // Prevents auto-restart if user clicked stop
-
-const getPatientAudioCtx = () => getAudioCtx(); // Use shared context
-
+let _patientAlarmIter = 0;
 
 const stopPatientAlarm = () => {
   _patientAlarmStopped = true;
-  _patientManualSilence = true; 
+  _patientManualSilence = true;
   if (_patientAlarmTimeoutId !== null) {
     clearTimeout(_patientAlarmTimeoutId);
     _patientAlarmTimeoutId = null;
   }
+};
+
+const playPatientBeep = (ctx) => {
+  if (!ctx || ctx.state !== 'running') return;
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.7, ctx.currentTime);
+  gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.22);
+  gain.connect(ctx.destination);
+  const osc = ctx.createOscillator();
+  osc.type = 'square';
+  osc.frequency.setValueAtTime(_patientAlarmIter % 2 === 0 ? 960 : 720, ctx.currentTime);
+  osc.connect(gain);
+  osc.start(ctx.currentTime);
+  osc.stop(ctx.currentTime + 0.25);
+  _patientAlarmIter++;
+};
+
+const schedulePatientNext = () => {
+  _patientAlarmTimeoutId = setTimeout(() => {
+    if (_patientAlarmStopped) return;
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') {
+      ctx.resume().then(() => {
+        playPatientBeep(ctx);
+        schedulePatientNext();
+      }).catch(() => schedulePatientNext());
+    } else {
+      playPatientBeep(ctx);
+      schedulePatientNext();
+    }
+  }, 340);
 };
 
 
@@ -112,39 +142,26 @@ const PatientDashboard = ({
     if (patient.emergencyTriggered) {
       if (_patientAlarmStopped && !_patientManualSilence) {
         _patientAlarmStopped = false;
+        _patientAlarmIter = 0;
 
-        const ctx = getPatientAudioCtx();
+        const ctx = getAudioCtx();
         if (!ctx) return;
 
+        if (navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 500]);
+
         if (ctx.state === 'suspended') {
-          ctx.resume().catch(() => console.warn("Patient Autoplay blocked."));
+          ctx.resume().then(() => {
+            playPatientBeep(ctx);
+            schedulePatientNext();
+          }).catch(() => schedulePatientNext());
+        } else {
+          playPatientBeep(ctx);
+          schedulePatientNext();
         }
 
-        let iter = 0;
-        const scheduleBeep = () => {
-          if (_patientAlarmStopped || !ctx) return;
-          if (ctx.state === 'running') {
-            const gain = ctx.createGain();
-            gain.gain.setValueAtTime(0.7, ctx.currentTime);
-            gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.22);
-            gain.connect(ctx.destination);
-            const osc = ctx.createOscillator();
-            osc.type = 'square';
-            osc.frequency.setValueAtTime(iter % 2 === 0 ? 960 : 720, ctx.currentTime);
-            osc.connect(gain);
-            osc.start(ctx.currentTime);
-            osc.stop(ctx.currentTime + 0.25);
-            iter++;
-          }
-          _patientAlarmTimeoutId = setTimeout(scheduleBeep, 340);
-        };
-
-        if (navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 500]);
-        scheduleBeep();
-
-        const unlockPatient = () => { if (ctx.state === 'suspended') ctx.resume(); };
+        const unlockPatient = () => { const c = getAudioCtx(); if (c && c.state === 'suspended') c.resume(); };
         window.addEventListener('click', unlockPatient, { once: true });
-        window.addEventListener('click', unlockPatient, { once: true });
+        window.addEventListener('touchstart', unlockPatient, { once: true });
         window.addEventListener('keydown', unlockPatient, { once: true });
       }
     } else {
@@ -153,7 +170,7 @@ const PatientDashboard = ({
     }
 
     const checkAudio = setInterval(() => {
-      const ctx = getPatientAudioCtx();
+      const ctx = getAudioCtx();
       setAudioState(ctx ? ctx.state : 'unsupported');
     }, 500);
 
