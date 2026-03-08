@@ -5,6 +5,7 @@ import PortalSelection from './pages/PortalSelection';
 import Login from './pages/Login';
 import PatientDashboard from './pages/PatientDashboard';
 import CaregiverDashboard from './pages/CaregiverDashboard';
+import { fallbackData } from './utils/mockData';
 import './index.css';
 
 function App() {
@@ -17,10 +18,17 @@ function App() {
   useEffect(() => {
     let ws;
     let reconnectTimeout;
+    let fallbackTimer;
 
     const connectWS = () => {
+      // Connect to websocket if running locally
       ws = new WebSocket('ws://localhost:5000');
       wsRef.current = ws;
+
+      // Start a fallback timer. If no live data arrives in 1.5 seconds, use mock data
+      fallbackTimer = setTimeout(() => {
+        setGlobalState(prev => prev.caretakers.length === 0 ? fallbackData : prev);
+      }, 1500);
 
       ws.onopen = () => {
         console.log('Connected to health monitoring server');
@@ -32,6 +40,7 @@ function App() {
           const data = JSON.parse(event.data);
           if (data.type === 'health_update') {
             const newState = data.payload;
+            clearTimeout(fallbackTimer); // We have live data, clear fallback
             setGlobalState(newState);
 
             // AUTO-SYNC: If we have an active targeted alarm, check if it's still active in globalState
@@ -58,6 +67,9 @@ function App() {
 
       ws.onclose = () => {
         console.log('WebSocket disconnected. Reconnecting in 3s...');
+        // Ensure UI doesn't hang if backend offline when opening app
+        setGlobalState(prev => prev.caretakers.length === 0 ? fallbackData : prev);
+
         setConnectionStatus('disconnected');
         wsRef.current = null;
         reconnectTimeout = setTimeout(connectWS, 3000);
@@ -72,8 +84,9 @@ function App() {
     connectWS();
 
     return () => {
-      clearTimeout(reconnectTimeout);
       if (ws) ws.close();
+      clearTimeout(reconnectTimeout);
+      clearTimeout(fallbackTimer);
     };
   }, []);
 
