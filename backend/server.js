@@ -7,9 +7,9 @@ const { state, startDataGeneration, generateId } = require('./dataGenerator');
 // Override patient locations with real GPS seed coordinates (Cedars-Sinai Medical Center, LA)
 // This ensures the correct coords are used regardless of any module cache
 const GPS_SEED = [
-  { id: 'p1', lat: 34.0754, lng: -118.3811, name: 'Main Lobby' },
-  { id: 'p2', lat: 34.0758, lng: -118.3805, name: 'Room 207 (East Wing)' },
-  { id: 'p3', lat: 34.0750, lng: -118.3820, name: 'Room 112 (West Wing)' },
+  { id: 'GF-001', lat: 34.0754, lng: -118.3811, name: 'Main Lobby' },
+  { id: 'GF-002', lat: 34.0758, lng: -118.3805, name: 'Room 207 (East Wing)' },
+  { id: 'GF-003', lat: 34.0750, lng: -118.3820, name: 'Room 112 (West Wing)' },
 ];
 GPS_SEED.forEach(seed => {
   const p = state.patients.find(p => p.id === seed.id);
