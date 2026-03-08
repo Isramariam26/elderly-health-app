@@ -45,7 +45,10 @@ function App() {
           } else if (data.type === 'connection_status') {
             console.log(data.payload.message);
           } else if (data.type === 'emergency_alarm') {
-            // Targeted alarm for THIS caregiver
+            // Targeted alarm for the assigned caregiver
+            setActiveAlarm(data.payload);
+          } else if (data.type === 'emergency_dispatched') {
+            // Broadcast to ALL clients — trigger alarm sound on every caregiver session
             setActiveAlarm(data.payload);
           }
         } catch (error) {
