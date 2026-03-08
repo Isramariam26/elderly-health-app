@@ -54,6 +54,16 @@ const CaregiverDashboard = ({
   const mapRef = useRef(null);
   const mapInstance = useRef(null);
   const markersRef = useRef({}); // { id: L.Marker }
+  const [leafletReady, setLeafletReady] = useState(!!window.L);
+
+  // Poll for Leaflet to be available (CDN may load after React)
+  useEffect(() => {
+    if (window.L) { setLeafletReady(true); return; }
+    const poll = setInterval(() => {
+      if (window.L) { setLeafletReady(true); clearInterval(poll); }
+    }, 100);
+    return () => clearInterval(poll);
+  }, []);
 
   // Tasks state for forms
   const [newTaskText, setNewTaskText] = useState('');
@@ -161,18 +171,22 @@ const CaregiverDashboard = ({
   };
 
   useEffect(() => {
-    if (activeTab !== 'patients' || !mapRef.current || !window.L) return;
+    if (activeTab !== 'patients' || !mapRef.current || !leafletReady || !window.L) return;
 
     const L = window.L;
 
     // Initialize Map
     if (!mapInstance.current) {
       const center = [34.0754, -118.3811]; // Cedars-Sinai
-      mapInstance.current = L.map(mapRef.current).setView(center, 17);
-      
+      mapInstance.current = L.map(mapRef.current, { zoomControl: true }).setView(center, 17);
+
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors'
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 19
       }).addTo(mapInstance.current);
+
+      // Force tiles to render after container is fully laid out
+      setTimeout(() => mapInstance.current?.invalidateSize(), 300);
     }
 
     // Helper for custom icons with labels
@@ -265,7 +279,7 @@ const CaregiverDashboard = ({
       }
     });
 
-  }, [activeTab, allPatients, allCaretakers]);
+  }, [activeTab, allPatients, allCaretakers, leafletReady]);
 
   return (
     <div className="dashboard-content-wrapper" style={{maxWidth: '1200px', margin: '0 auto'}}>
@@ -449,8 +463,10 @@ const CaregiverDashboard = ({
                  <div style={{fontSize: '0.85rem', color: 'var(--text-muted)'}}>Real-time Tracking</div>
                </div>
                
-               <div ref={mapRef} style={{width: '100%', height: '450px', backgroundColor: '#eef2f5', borderRadius: '12px', border: '1px solid var(--border-color)', overflow: 'hidden', zIndex: 1}}>
-                 {/* Leaflet Map Container */}
+               <div ref={mapRef} style={{width: '100%', height: '450px', backgroundColor: '#eef2f5', borderRadius: '12px', border: '1px solid var(--border-color)', zIndex: 1}}>
+                 {!leafletReady && (
+                   <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100%',color:'var(--text-muted)',fontSize:'0.9rem'}}>Loading map...</div>
+                 )}
                </div>
             </section>
           </div>
