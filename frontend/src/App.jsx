@@ -91,6 +91,42 @@ function App() {
     };
   }, []);
 
+  // --- OFFLINE VITALS SIMULATOR ---
+  React.useEffect(() => {
+    if (connectionStatus === 'connected') return;
+    
+    // If offline, simulate live vital fluctuations every 2.5 seconds
+    const interval = setInterval(() => {
+      setGlobalState(prev => {
+        if (!prev.patients || prev.patients.length === 0) return prev;
+        
+        const next = JSON.parse(JSON.stringify(prev));
+        next.patients.forEach(p => {
+          // Fluctuate HR (-2 to +2)
+          const hrChange = Math.floor(Math.random() * 5) - 2;
+          p.hr = Math.max(50, Math.min(150, p.hr + hrChange));
+          
+          // Fluctuate SpO2 occasionally (-1 to +1)
+          if (Math.random() > 0.7) {
+             const o2Change = Math.floor(Math.random() * 3) - 1;
+             p.spO2 = Math.max(88, Math.min(100, p.spO2 + o2Change));
+          }
+          
+          // Fluctuate BP slightly occasionally
+          if (Math.random() > 0.8) {
+             const sysChange = Math.floor(Math.random() * 5) - 2;
+             const diaChange = Math.floor(Math.random() * 3) - 1;
+             p.systolic = Math.max(90, Math.min(180, p.systolic + sysChange));
+             p.diastolic = Math.max(60, Math.min(120, p.diastolic + diaChange));
+          }
+        });
+        return next;
+      });
+    }, 2500);
+
+    return () => clearInterval(interval);
+  }, [connectionStatus]);
+
   const sendCommand = (cmdObj) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify(cmdObj));
@@ -134,19 +170,78 @@ function App() {
              const p = next.patients?.find(p => p.id === cmdObj.patientId);
              if (p) p.emergencyTriggered = true;
              
+             // --- OFFLINE ROUTING ALGORITHM ---
+             let bestCaretaker = null;
+             let highestScore = -Infinity;
+             const now = new Date();
+             
+             const getDistance = (loc1, loc2) => {
+               if (!loc1 || !loc2) return 0;
+               const dx = loc1.lat - loc2.lat;
+               const dy = loc1.lng - loc2.lng;
+               return Math.sqrt(dx*dx + dy*dy);
+             };
+
+             const severity = cmdObj.severity || 'high';
+
+             next.caretakers.forEach(caretaker => {
+               let score = 100;
+
+               // Proximity
+               const dist = getDistance(p?.location, caretaker.location);
+               score -= (dist * 100000); // Scale distance impact
+
+               // Skill Match
+               const isAdvanced = caretaker.skills.some(s => 
+                 s.includes('Advanced') || s.includes('Critical') || s.includes('RN') || s.includes('Registered Nurse')
+               );
+               if (severity === 'high') {
+                 if (isAdvanced) score += 50;
+                 else score -= 80;
+               }
+
+               // Task Interruptibility
+               const hasNonInterruptible = caretaker.tasks?.some(t => !t.completed && !t.interruptible);
+               if (hasNonInterruptible) {
+                 score -= 100;
+               }
+
+               // Shift Timing
+               const shiftEnd = new Date(caretaker.shiftEnd);
+               const minsLeft = (shiftEnd - now) / (1000 * 60);
+               if (minsLeft < 0) score -= 500;
+               else if (minsLeft < 30) score -= 60;
+
+               if (score > highestScore) {
+                 highestScore = score;
+                 bestCaretaker = caretaker;
+               }
+             });
+
+             const dist = getDistance(p?.location, bestCaretaker?.location);
+             const distMeters = dist ? Math.round(dist * 111000) : 0;
+             const assignmentReason = [
+               `Nearest available (~${distMeters}m)`,
+               bestCaretaker?.skills?.[0] ? `Skill Match: ${bestCaretaker.skills[0]}` : null,
+               highestScore < 0 ? `Selected despite shift constraints` : null
+             ].filter(Boolean).join(' • ');
+
              // Simulate server broadcast
              setTimeout(() => {
                setActiveAlarm({ 
                  patientId: cmdObj.patientId, 
                  patientName: p?.name || 'Unknown Patient', 
                  locationName: p?.location?.name || 'Unknown Location', 
-                 severity: cmdObj.severity || 'high',
+                 severity: severity,
                  status: {
                    hr: p?.hr,
                    bp: `${p?.systolic}/${p?.diastolic}`,
                    spO2: p?.spO2,
                    temp: p?.temp?.toFixed(1)
-                 }
+                 },
+                 assignedCaretakerId: bestCaretaker?.id,
+                 assignedCaretakerName: bestCaretaker?.name,
+                 assignmentReason: assignmentReason
                });
              }, 100);
              break;
